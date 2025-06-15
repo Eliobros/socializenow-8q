@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Home, User, LogOut } from "lucide-react"
+import { Home, User, LogOut, Bell, MessageCircle } from "lucide-react"
 
 interface UserData {
   name: string
@@ -60,6 +60,20 @@ export function Navbar() {
               </Button>
             </Link>
 
+            <Link href="/notifications">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <Bell className="h-4 w-4" />
+                Notificações
+              </Button>
+            </Link>
+
+            <Link href="/messages">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <MessageCircle className="h-4 w-4" />
+                Mensagens
+              </Button>
+            </Link>
+
             {user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -76,9 +90,11 @@ export function Navbar() {
                       <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
                     </div>
                   </div>
-                  <DropdownMenuItem>
-                    <User className="mr-2 h-4 w-4" />
-                    Perfil
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="flex items-center">
+                      <User className="mr-2 h-4 w-4" />
+                      Perfil
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />

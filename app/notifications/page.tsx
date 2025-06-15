@@ -1,0 +1,223 @@
+"use client"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Navbar } from "@/components/navbar"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, Bell, Heart, MessageCircle, UserPlus, Check } from "lucide-react"
+
+interface Notification {
+  _id: string
+  type: "like" | "comment" | "follow" | "mention"
+  message: string
+  from: {
+    name: string
+    username: string
+    avatar: string
+  }
+  read: boolean
+  createdAt: string
+  postId?: string
+}
+
+export default function NotificationsPage() {
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+      return
+    }
+    fetchNotifications()
+
+    // Simular notificações em tempo real
+    const interval = setInterval(fetchNotifications, 30000) // Atualiza a cada 30 segundos
+
+    return () => clearInterval(interval)
+  }, [router])
+
+  const fetchNotifications = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("/api/notifications", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setNotifications(data.notifications)
+      } else {
+        setError("Erro ao carregar notificações")
+      }
+    } catch (error) {
+      setError("Erro de conexão")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const markAsRead = async (notificationId: string) => {
+    try {
+      const token = localStorage.getItem("token")
+      await fetch(`/api/notifications/${notificationId}/read`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      setNotifications((prev) => prev.map((notif) => (notif._id === notificationId ? { ...notif, read: true } : notif)))
+    } catch (error) {
+      console.error("Erro ao marcar como lida")
+    }
+  }
+
+  const markAllAsRead = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      await fetch("/api/notifications/read-all", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      setNotifications((prev) => prev.map((notif) => ({ ...notif, read: true })))
+    } catch (error) {
+      console.error("Erro ao marcar todas como lidas")
+    }
+  }
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case "like":
+        return <Heart className="h-5 w-5 text-red-500" />
+      case "comment":
+        return <MessageCircle className="h-5 w-5 text-blue-500" />
+      case "follow":
+        return <UserPlus className="h-5 w-5 text-green-500" />
+      default:
+        return <Bell className="h-5 w-5 text-gray-500" />
+    }
+  }
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+
+    if (diffInHours < 1) {
+      return "Agora há pouco"
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h atrás`
+    } else {
+      const diffInDays = Math.floor(diffInHours / 24)
+      return `${diffInDays}d atrás`
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    )
+  }
+
+  const unreadCount = notifications.filter((n) => !n.read).length
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-6 w-6" />
+                Notificações
+                {unreadCount > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {unreadCount}
+                  </Badge>
+                )}
+              </CardTitle>
+              {unreadCount > 0 && (
+                <Button variant="outline" size="sm" onClick={markAllAsRead}>
+                  <Check className="h-4 w-4 mr-2" />
+                  Marcar todas como lidas
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+        </Card>
+
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="space-y-4">
+          {notifications.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">Nenhuma notificação encontrada</p>
+              </CardContent>
+            </Card>
+          ) : (
+            notifications.map((notification) => (
+              <Card
+                key={notification._id}
+                className={`cursor-pointer transition-colors ${!notification.read ? "bg-blue-50 border-blue-200" : ""}`}
+                onClick={() => !notification.read && markAsRead(notification._id)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-blue-600 text-white">
+                        {getInitials(notification.from.name)}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {getNotificationIcon(notification.type)}
+                        <span className="font-medium">{notification.from.name}</span>
+                        {!notification.read && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
+                      </div>
+                      <p className="text-gray-700 text-sm mb-2">{notification.message}</p>
+                      <p className="text-gray-500 text-xs">{formatDate(notification.createdAt)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
