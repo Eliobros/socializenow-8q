@@ -1,6 +1,6 @@
 📌 Título e Descrição
 
-<img src="https://readme-typing-svg.herokuapp.com/?font=mono&size=30&duration=4000&color=FF0000&center=falso&vCenter=falso&lines=🜛+Socialize+🜛;۞+OFC+Now+۞;">      
+<img src="https://readme-typing-svg.herokuapp.com/?font=mono&size=30&duration=4000&color=FF0000&center=falso&vCenter=falso&lines=🜛+SocializeNow+۞;">      
 
 SocializeNow é uma rede social moderna desenvolvida com tecnologias web de ponta. Permite que usuários criem perfis, publiquem atualizações, sigam outros usuários, interajam com posts em tempo real e iniciem conversas privadas — tudo com uma experiência fluida e responsiva.
 
