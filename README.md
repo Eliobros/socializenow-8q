@@ -61,33 +61,6 @@ Configure as variáveis de ambiente nos arquivos .env e .env.local.
 
 ---
 
-<span style="font-family: monospace; font-size: 30px;">
-  <span style="color: red;" id="text1"></span>
-  <span style="color: blue;" id="text2"></span>
-</span>
-
-<script>
-  const text1 = "Socialize";
-  const text2 = "Now";
-  let i = 0, j = 0;
-
-  function type() {
-    if (i < text1.length) {
-      document.getElementById("text1").textContent += text1.charAt(i);
-      i++;
-      setTimeout(type, 100);
-    } else if (j < text2.length) {
-      document.getElementById("text2").textContent += text2.charAt(j);
-      j++;
-      setTimeout(type, 100);
-    }
-  }
-
-  type();
-</script>
-
----
-
 🧪 Planejadas para Futuro
 
 - 📱 Versão mobile com PWA
