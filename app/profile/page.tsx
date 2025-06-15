@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { PostCard } from "@/components/post-card"
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Edit, MessageSquare, Settings, Shield } from "lucide-react"
+import { Loader2, Edit, MessageSquare, Settings, Shield, Camera } from "lucide-react"
 
 interface UserProfile {
   _id: string
@@ -44,16 +44,17 @@ export default function ProfilePage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [activeTab, setActiveTab] = useState("profile")
+  const [activeTab, setActiveTab] = useState("posts")
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
   const [profileForm, setProfileForm] = useState({
     name: "",
     username: "",
     bio: "",
-    avatar: "",
   })
 
   const [passwordForm, setPasswordForm] = useState({
@@ -88,7 +89,6 @@ export default function ProfilePage() {
           name: data.profile.name,
           username: data.profile.username || "",
           bio: data.profile.bio || "",
-          avatar: data.profile.avatar || "",
         })
       } else {
         setError("Erro ao carregar perfil")
@@ -115,6 +115,53 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error("Erro ao carregar posts do usuário")
+    }
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith("image/")) {
+      setError("Por favor, selecione apenas arquivos de imagem")
+      return
+    }
+
+    // Validar tamanho (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setError("A imagem deve ter no máximo 5MB")
+      return
+    }
+
+    setUploading(true)
+    setError("")
+
+    try {
+      const formData = new FormData()
+      formData.append("avatar", file)
+
+      const token = localStorage.getItem("token")
+      const response = await fetch("/api/profile/avatar", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setSuccess("Foto de perfil atualizada com sucesso!")
+        fetchProfile()
+      } else {
+        setError(data.error || "Erro ao fazer upload da imagem")
+      }
+    } catch (error) {
+      setError("Erro de conexão")
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -249,6 +296,15 @@ export default function ProfilePage() {
                     {getInitials(profile.name)}
                   </AvatarFallback>
                 </Avatar>
+                <Button
+                  size="sm"
+                  className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                </Button>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
               </div>
 
               <div className="flex-1 text-center md:text-left">
@@ -280,15 +336,15 @@ export default function ProfilePage() {
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="posts" className="gap-2">
               <MessageSquare className="h-4 w-4" />
-              Posts
+              <span className="hidden sm:inline">Posts</span>
             </TabsTrigger>
             <TabsTrigger value="profile" className="gap-2">
               <Settings className="h-4 w-4" />
-              Perfil
+              <span className="hidden sm:inline">Perfil</span>
             </TabsTrigger>
             <TabsTrigger value="security" className="gap-2">
               <Shield className="h-4 w-4" />
-              Segurança
+              <span className="hidden sm:inline">Segurança</span>
             </TabsTrigger>
           </TabsList>
 
@@ -355,16 +411,6 @@ export default function ProfilePage() {
                       onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
                       placeholder="Conte um pouco sobre você..."
                       rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="avatar">URL da Foto de Perfil</Label>
-                    <Input
-                      id="avatar"
-                      value={profileForm.avatar}
-                      onChange={(e) => setProfileForm({ ...profileForm, avatar: e.target.value })}
-                      placeholder="https://exemplo.com/sua-foto.jpg"
                     />
                   </div>
 

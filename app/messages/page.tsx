@@ -2,14 +2,15 @@
 
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Loader2, Send, MessageCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Loader2, Send, MessageCircle, Plus } from "lucide-react"
 
 interface Message {
   _id: string
@@ -43,6 +44,13 @@ interface Conversation {
   unreadCount: number
 }
 
+interface User {
+  _id: string
+  name: string
+  username: string
+  avatar: string
+}
+
 export default function MessagesPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [messages, setMessages] = useState<Message[]>([])
@@ -52,8 +60,13 @@ export default function MessagesPage() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState("")
   const [currentUserId, setCurrentUserId] = useState("")
+  const [searchUsers, setSearchUsers] = useState<User[]>([])
+  const [userSearchTerm, setUserSearchTerm] = useState("")
+  const [searchingUsers, setSearchingUsers] = useState(false)
+  const [showNewChatDialog, setShowNewChatDialog] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     const token = localStorage.getItem("token")
@@ -72,6 +85,13 @@ export default function MessagesPage() {
 
     fetchConversations()
 
+    // Check if there's a conversation ID in the URL
+    const conversationId = searchParams.get("conversation")
+    if (conversationId) {
+      setSelectedConversation(conversationId)
+      fetchMessages(conversationId)
+    }
+
     // Simular mensagens em tempo real
     const interval = setInterval(() => {
       fetchConversations()
@@ -81,7 +101,7 @@ export default function MessagesPage() {
     }, 5000) // Atualiza a cada 5 segundos
 
     return () => clearInterval(interval)
-  }, [router, selectedConversation])
+  }, [router, selectedConversation, searchParams])
 
   useEffect(() => {
     scrollToBottom()
@@ -162,6 +182,58 @@ export default function MessagesPage() {
     }
   }
 
+  const searchUsersForChat = async (query: string) => {
+    if (!query.trim()) {
+      setSearchUsers([])
+      return
+    }
+
+    setSearchingUsers(true)
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`/api/search/users?q=${encodeURIComponent(query)}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSearchUsers(data.users)
+      }
+    } catch (error) {
+      console.error("Erro ao buscar usuários")
+    } finally {
+      setSearchingUsers(false)
+    }
+  }
+
+  const startNewConversation = async (userId: string) => {
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("/api/messages/conversations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSelectedConversation(data.conversationId)
+        fetchMessages(data.conversationId)
+        fetchConversations()
+        setShowNewChatDialog(false)
+        setUserSearchTerm("")
+        setSearchUsers([])
+      }
+    } catch (error) {
+      console.error("Erro ao iniciar conversa")
+    }
+  }
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -213,14 +285,61 @@ export default function MessagesPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
           {/* Lista de Conversas */}
-          <Card className="md:col-span-1">
-            <CardHeader>
+          <Card className="lg:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="flex items-center gap-2">
                 <MessageCircle className="h-5 w-5" />
-                Mensagens
+                <span className="hidden sm:inline">Mensagens</span>
               </CardTitle>
+              <Dialog open={showNewChatDialog} onOpenChange={setShowNewChatDialog}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="h-8 w-8 p-0">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Nova Conversa</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Buscar usuários..."
+                        value={userSearchTerm}
+                        onChange={(e) => {
+                          setUserSearchTerm(e.target.value)
+                          searchUsersForChat(e.target.value)
+                        }}
+                        className="flex-1"
+                      />
+                      {searchingUsers && <Loader2 className="h-4 w-4 animate-spin mt-3" />}
+                    </div>
+                    <ScrollArea className="h-60">
+                      <div className="space-y-2">
+                        {searchUsers.map((user) => (
+                          <div
+                            key={user._id}
+                            className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                            onClick={() => startNewConversation(user._id)}
+                          >
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback className="bg-blue-600 text-white">
+                                {getInitials(user.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{user.name}</p>
+                              {user.username && <p className="text-sm text-gray-500">@{user.username}</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent className="p-0">
               <ScrollArea className="h-[500px]">
@@ -275,7 +394,7 @@ export default function MessagesPage() {
           </Card>
 
           {/* Área de Mensagens */}
-          <Card className="md:col-span-2">
+          <Card className="lg:col-span-2">
             {selectedConversation ? (
               <>
                 <CardHeader className="border-b">
