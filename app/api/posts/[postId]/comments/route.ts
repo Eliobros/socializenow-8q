@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
@@ -14,13 +14,17 @@ function verifyToken(request: NextRequest) {
   const token = authHeader.substring(7)
   try {
     return jwt.verify(token, JWT_SECRET) as any
-  } catch (error) {
+  } catch {
     return null
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { postId: string } }) {
+export async function POST(request: NextRequest, context: { params: { postId: string } }) {
   try {
+    // Aguardar params porque pode ser uma Promise
+    const { params } = await context
+    const { postId } = params
+
     const user = verifyToken(request)
     if (!user) {
       return NextResponse.json({ error: "Token inválido" }, { status: 401 })
@@ -39,14 +43,14 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
     const notifications = db.collection("notifications")
 
     // Verificar se o post existe
-    const post = await posts.findOne({ _id: new ObjectId(params.postId) })
+    const post = await posts.findOne({ _id: new ObjectId(postId) })
     if (!post) {
       return NextResponse.json({ error: "Post não encontrado" }, { status: 404 })
     }
 
     // Criar comentário
     const comment = {
-      postId: new ObjectId(params.postId),
+      postId: new ObjectId(postId),
       authorId: new ObjectId(user.userId),
       content: content.trim(),
       createdAt: new Date(),
@@ -66,7 +70,7 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
           username: user.username || "",
           avatar: user.avatar || "",
         },
-        postId: new ObjectId(params.postId),
+        postId: new ObjectId(postId),
         read: false,
         createdAt: new Date(),
       })
@@ -77,7 +81,8 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
       commentId: result.insertedId,
     })
   } catch (error) {
-    console.error("Add comment error:", error)
+    console.error("Erro ao adicionar comentário:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
+

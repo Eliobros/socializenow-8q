@@ -32,41 +32,34 @@ export async function GET(request: NextRequest) {
 
     // Get user notifications with sender information
     const userNotifications = await notifications
-      .aggregate([
-        {
-          $match: { userId: new ObjectId(user.userId) },
-        },
-        {
-          $lookup: {
-            from: "users",
-            localField: "fromUserId",
-            foreignField: "_id",
-            as: "from",
-          },
-        },
-        {
-          $unwind: "$from",
-        },
-        {
-          $project: {
-            type: 1,
-            message: 1,
-            read: 1,
-            createdAt: 1,
-            postId: 1,
-            "from.name": 1,
-            "from.username": 1,
-            "from.avatar": 1,
-          },
-        },
-        {
-          $sort: { createdAt: -1 },
-        },
-        {
-          $limit: 50,
-        },
-      ])
-      .toArray()
+  .aggregate([
+    { $match: { userId: new ObjectId(user.userId) } },
+    {
+      $lookup: {
+        from: "users",
+        localField: "fromUserId",
+        foreignField: "_id",
+        as: "from",
+      },
+    },
+    { $unwind: "$from" },
+    {
+      $project: {
+        type: 1,
+        message: 1,
+        read: 1,
+        createdAt: 1,
+        postId: 1,
+        "from.name": 1,
+        "from.username": 1,
+        "from.avatar": 1,
+      },
+    },
+    { $sort: { createdAt: -1 } },
+    { $limit: 50 },
+  ])
+  .toArray()
+ 
 
     return NextResponse.json({ notifications: userNotifications })
   } catch (error) {

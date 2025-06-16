@@ -19,7 +19,10 @@ function verifyToken(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { userId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { userId: string } }
+) {
   try {
     const user = verifyToken(request)
     if (!user) {
@@ -82,3 +85,4 @@ export async function GET(request: NextRequest, { params }: { params: { userId: 
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
+
