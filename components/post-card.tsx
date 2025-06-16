@@ -3,7 +3,9 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Heart, MessageCircle, Share } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Heart, MessageCircle, Share, Send } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 
@@ -18,7 +20,8 @@ interface Post {
   }
   createdAt: string
   likes: number
-  likedByUser: boolean  // Novo campo vindo do backend
+  likedByUser: boolean
+  commentsCount?: number
 }
 
 interface PostCardProps {
@@ -29,6 +32,9 @@ export function PostCard({ post }: PostCardProps) {
   const [liked, setLiked] = useState(post.likedByUser)
   const [likeCount, setLikeCount] = useState(post.likes || 0)
   const [isLiking, setIsLiking] = useState(false)
+  const [comment, setComment] = useState("")
+  const [isCommenting, setIsCommenting] = useState(false)
+  const [showShareDialog, setShowShareDialog] = useState(false)
 
   const getInitials = (name: string) => {
     return name
@@ -51,7 +57,7 @@ export function PostCard({ post }: PostCardProps) {
   }
 
   const handleLike = async () => {
-    if (isLiking || liked) return // Impede curtir várias vezes
+    if (isLiking) return
 
     setIsLiking(true)
     try {
@@ -75,6 +81,56 @@ export function PostCard({ post }: PostCardProps) {
     }
   }
 
+  const handleComment = async () => {
+    if (!comment.trim() || isCommenting) return
+
+    setIsCommenting(true)
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`/api/posts/${post._id}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content: comment }),
+      })
+
+      if (response.ok) {
+        setComment("")
+        // Aqui você pode atualizar a lista de comentários ou recarregar o post
+      }
+    } catch (error) {
+      console.error("Error commenting:", error)
+    } finally {
+      setIsCommenting(false)
+    }
+  }
+
+  const handleShare = async (platform: string) => {
+    const postUrl = `${window.location.origin}/post/${post._id}`
+    const text = `Confira este post no SocializeNow: ${post.content.substring(0, 100)}...`
+
+    switch (platform) {
+      case "copy":
+        await navigator.clipboard.writeText(postUrl)
+        alert("Link copiado!")
+        break
+      case "whatsapp":
+        window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + postUrl)}`)
+        break
+      case "twitter":
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(postUrl)}`,
+        )
+        break
+      case "facebook":
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`)
+        break
+    }
+    setShowShareDialog(false)
+  }
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -89,31 +145,82 @@ export function PostCard({ post }: PostCardProps) {
             <Link href={`/profile/${post.author._id}`} className="font-semibold hover:text-blue-600 transition-colors">
               {post.author.name}
             </Link>
-            <p className="text-sm text-gray-500">{formatDate(post.createdAt)}</p>
+            <p className="text-sm text-muted-foreground">{formatDate(post.createdAt)}</p>
           </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <p className="text-gray-800 mb-4 whitespace-pre-wrap">{post.content}</p>
+        <p className="mb-4 whitespace-pre-wrap">{post.content}</p>
         <div className="flex items-center gap-4 pt-2 border-t">
           <Button
             variant="ghost"
             size="sm"
-            className={`gap-2 ${liked ? "text-red-600" : "text-gray-600 hover:text-red-600"}`}
+            className={`gap-2 ${liked ? "text-red-600" : "text-muted-foreground hover:text-red-600"}`}
             onClick={handleLike}
-            disabled={isLiking || liked} // Desativa botão se já curtiu
+            disabled={isLiking}
           >
             <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />
             {likeCount}
           </Button>
-          <Button variant="ghost" size="sm" className="gap-2 text-gray-600 hover:text-blue-600">
-            <MessageCircle className="h-4 w-4" />
-            Comentar
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-2 text-gray-600 hover:text-green-600">
-            <Share className="h-4 w-4" />
-            Compartilhar
-          </Button>
+
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-blue-600">
+                <MessageCircle className="h-4 w-4" />
+                Comentar
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Comentar no post</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm">{post.content}</p>
+                </div>
+                <div className="space-y-2">
+                  <Textarea
+                    placeholder="Escreva seu comentário..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    rows={3}
+                  />
+                  <Button onClick={handleComment} disabled={!comment.trim() || isCommenting} className="w-full">
+                    {isCommenting ? "Comentando..." : "Comentar"}
+                    <Send className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-green-600">
+                <Share className="h-4 w-4" />
+                Compartilhar
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Compartilhar post</DialogTitle>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-4">
+                <Button variant="outline" onClick={() => handleShare("copy")}>
+                  Copiar Link
+                </Button>
+                <Button variant="outline" onClick={() => handleShare("whatsapp")}>
+                  WhatsApp
+                </Button>
+                <Button variant="outline" onClick={() => handleShare("twitter")}>
+                  Twitter
+                </Button>
+                <Button variant="outline" onClick={() => handleShare("facebook")}>
+                  Facebook
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </CardContent>
     </Card>

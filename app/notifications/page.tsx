@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -14,6 +14,7 @@ interface Notification {
   type: "like" | "comment" | "follow" | "mention"
   message: string
   from: {
+    _id: string
     name: string
     username: string
     avatar: string
@@ -21,6 +22,7 @@ interface Notification {
   read: boolean
   createdAt: string
   postId?: string
+  targetUrl?: string
 }
 
 export default function NotificationsPage() {
@@ -97,6 +99,33 @@ export default function NotificationsPage() {
     }
   }
 
+  const handleNotificationClick = async (notification: Notification) => {
+    // Marcar como lida se não estiver
+    if (!notification.read) {
+      await markAsRead(notification._id)
+    }
+
+    // Navegar baseado no tipo de notificação
+    switch (notification.type) {
+      case "follow":
+        router.push(`/profile/${notification.from._id}`)
+        break
+      case "like":
+      case "comment":
+        if (notification.postId) {
+          router.push(`/post/${notification.postId}`)
+        }
+        break
+      case "mention":
+        if (notification.targetUrl) {
+          router.push(notification.targetUrl)
+        }
+        break
+      default:
+        break
+    }
+  }
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "like":
@@ -136,7 +165,7 @@ export default function NotificationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <Navbar />
         <div className="flex items-center justify-center h-96">
           <Loader2 className="h-8 w-8 animate-spin" />
@@ -148,7 +177,7 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter((n) => !n.read).length
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <Card className="mb-6">
@@ -184,19 +213,27 @@ export default function NotificationsPage() {
             <Card>
               <CardContent className="text-center py-12">
                 <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">Nenhuma notificação encontrada</p>
+                <p className="text-muted-foreground">Nenhuma notificação encontrada</p>
               </CardContent>
             </Card>
           ) : (
             notifications.map((notification) => (
               <Card
                 key={notification._id}
-                className={`cursor-pointer transition-colors ${!notification.read ? "bg-blue-50 border-blue-200" : ""}`}
-                onClick={() => !notification.read && markAsRead(notification._id)}
+                className={`cursor-pointer transition-colors hover:bg-muted/50 ${
+                  !notification.read ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800" : ""
+                }`}
+                onClick={() => handleNotificationClick(notification)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10">
+                      {notification.from.avatar ? (
+                        <AvatarImage
+                          src={notification.from.avatar || "/placeholder.svg"}
+                          alt={notification.from.name}
+                        />
+                      ) : null}
                       <AvatarFallback className="bg-blue-600 text-white">
                         {getInitials(notification.from.name)}
                       </AvatarFallback>
@@ -208,8 +245,8 @@ export default function NotificationsPage() {
                         <span className="font-medium">{notification.from.name}</span>
                         {!notification.read && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
                       </div>
-                      <p className="text-gray-700 text-sm mb-2">{notification.message}</p>
-                      <p className="text-gray-500 text-xs">{formatDate(notification.createdAt)}</p>
+                      <p className="text-sm mb-2">{notification.message}</p>
+                      <p className="text-muted-foreground text-xs">{formatDate(notification.createdAt)}</p>
                     </div>
                   </div>
                 </CardContent>

@@ -1,6 +1,8 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import { Analytics } from "@vercel/analytics/next"
+import type React from "react"
+import type { Metadata } from "next"
+import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
+
 export const metadata: Metadata = {
   title: "SocializeNow - Conecte-se com o mundo",
   description: "Rede social para conectar pessoas e compartilhar momentos.",
@@ -32,19 +34,21 @@ export const metadata: Metadata = {
   icons: {
     icon: "/socializenow.ico",
   },
-};
+    generator: 'v0.dev'
+}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
-    <html lang="pt">
+    <html lang="pt" suppressHydrationWarning>
       <body>
-        {children}
-        <Analytics />
-        </body>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
-  );
+  )
 }

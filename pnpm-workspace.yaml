@@ -1,6 +1,0 @@
-onlyBuiltDependencies:
-  - '@mongodb-js/zstd'
-  - bcrypt
-  - kerberos
-  - mongodb-client-encryption
-  - sharp

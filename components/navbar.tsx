@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Home, User, LogOut, Bell, MessageCircle, Search, Menu } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Home, User, LogOut, Bell, MessageCircle, Search, Menu, Moon, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
 
 interface UserData {
   name: string
@@ -18,23 +20,21 @@ interface UserData {
 export function Navbar() {
   const [user, setUser] = useState<UserData | null>(null)
   const [isMobile, setIsMobile] = useState(false)
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
+  const [unreadMessages, setUnreadMessages] = useState(0)
   const router = useRouter()
   const pathname = usePathname()
+  const { theme, setTheme } = useTheme()
 
   useEffect(() => {
     const token = localStorage.getItem("token")
     if (token) {
-      // Decode JWT to get user info (simplified)
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]))
-        setUser({
-          name: payload.name,
-          email: payload.email,
-          avatar: payload.avatar,
-        })
-      } catch (error) {
-        console.error("Error decoding token:", error)
-      }
+      fetchUserData()
+      fetchUnreadCounts()
+
+      // Atualizar contadores a cada 30 segundos
+      const interval = setInterval(fetchUnreadCounts, 30000)
+      return () => clearInterval(interval)
     }
 
     // Check if mobile
@@ -46,6 +46,60 @@ export function Navbar() {
     window.addEventListener("resize", checkMobile)
     return () => window.removeEventListener("resize", checkMobile)
   }, [])
+
+  const fetchUserData = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("/api/profile", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setUser({
+          name: data.profile.name,
+          email: data.profile.email,
+          avatar: data.profile.avatar,
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error)
+    }
+  }
+
+  const fetchUnreadCounts = async () => {
+    try {
+      const token = localStorage.getItem("token")
+
+      // Buscar notificações não lidas
+      const notificationsResponse = await fetch("/api/notifications/unread-count", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (notificationsResponse.ok) {
+        const notificationsData = await notificationsResponse.json()
+        setUnreadNotifications(notificationsData.count)
+      }
+
+      // Buscar mensagens não lidas
+      const messagesResponse = await fetch("/api/messages/unread-count", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (messagesResponse.ok) {
+        const messagesData = await messagesResponse.json()
+        setUnreadMessages(messagesData.count)
+      }
+    } catch (error) {
+      console.error("Error fetching unread counts:", error)
+    }
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -91,10 +145,18 @@ export function Navbar() {
         <Button
           variant={isActive("/notifications") ? "default" : "ghost"}
           size="sm"
-          className={mobile ? "w-full justify-start gap-2" : "gap-2"}
+          className={mobile ? "w-full justify-start gap-2 relative" : "gap-2 relative"}
         >
           <Bell className="h-4 w-4" />
           {(mobile || !isMobile) && "Notificações"}
+          {unreadNotifications > 0 && (
+            <Badge
+              variant="destructive"
+              className="absolute -top-1 -right-1 h-5 w-5 text-xs p-0 flex items-center justify-center"
+            >
+              {unreadNotifications > 99 ? "99+" : unreadNotifications}
+            </Badge>
+          )}
         </Button>
       </Link>
 
@@ -102,17 +164,25 @@ export function Navbar() {
         <Button
           variant={isActive("/messages") ? "default" : "ghost"}
           size="sm"
-          className={mobile ? "w-full justify-start gap-2" : "gap-2"}
+          className={mobile ? "w-full justify-start gap-2 relative" : "gap-2 relative"}
         >
           <MessageCircle className="h-4 w-4" />
           {(mobile || !isMobile) && "Mensagens"}
+          {unreadMessages > 0 && (
+            <Badge
+              variant="destructive"
+              className="absolute -top-1 -right-1 h-5 w-5 text-xs p-0 flex items-center justify-center"
+            >
+              {unreadMessages > 99 ? "99+" : unreadMessages}
+            </Badge>
+          )}
         </Button>
       </Link>
     </>
   )
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <nav className="bg-background border-b border-border sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <Link href="/feed" className="text-xl md:text-2xl font-bold">
@@ -125,6 +195,13 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            <Button variant="ghost" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <span className="sr-only">Toggle theme</span>
+            </Button>
+
             {/* Mobile Navigation */}
             {isMobile && (
               <Sheet>
