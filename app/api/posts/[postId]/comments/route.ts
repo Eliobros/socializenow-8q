@@ -19,10 +19,11 @@ function verifyToken(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest, context: { params: { postId: string } }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { postId: string } }
+) {
   try {
-    // Aguardar params porque pode ser uma Promise
-    const { params } = await context
     const { postId } = params
 
     const user = verifyToken(request)
@@ -42,13 +43,11 @@ export async function POST(request: NextRequest, context: { params: { postId: st
     const posts = db.collection("posts")
     const notifications = db.collection("notifications")
 
-    // Verificar se o post existe
     const post = await posts.findOne({ _id: new ObjectId(postId) })
     if (!post) {
       return NextResponse.json({ error: "Post não encontrado" }, { status: 404 })
     }
 
-    // Criar comentário
     const comment = {
       postId: new ObjectId(postId),
       authorId: new ObjectId(user.userId),
@@ -58,7 +57,6 @@ export async function POST(request: NextRequest, context: { params: { postId: st
 
     const result = await comments.insertOne(comment)
 
-    // Criar notificação para o autor do post (se não for o próprio usuário)
     if (post.authorId.toString() !== user.userId) {
       await notifications.insertOne({
         userId: post.authorId,
@@ -85,4 +83,3 @@ export async function POST(request: NextRequest, context: { params: { postId: st
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
-
