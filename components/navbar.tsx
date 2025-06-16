@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Home, User, LogOut, Bell, MessageCircle, Search, Menu } from "lucide-react"
@@ -12,6 +12,7 @@ import { Home, User, LogOut, Bell, MessageCircle, Search, Menu } from "lucide-re
 interface UserData {
   name: string
   email: string
+  avatar?: string
 }
 
 export function Navbar() {
@@ -26,7 +27,11 @@ export function Navbar() {
       // Decode JWT to get user info (simplified)
       try {
         const payload = JSON.parse(atob(token.split(".")[1]))
-        setUser({ name: payload.name, email: payload.email })
+        setUser({
+          name: payload.name,
+          email: payload.email,
+          avatar: payload.avatar,
+        })
       } catch (error) {
         console.error("Error decoding token:", error)
       }
@@ -141,6 +146,7 @@ export function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
+                      {user?.avatar ? <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} /> : null}
                       <AvatarFallback className="bg-blue-600 text-white">{getInitials(user.name)}</AvatarFallback>
                     </Avatar>
                   </Button>
