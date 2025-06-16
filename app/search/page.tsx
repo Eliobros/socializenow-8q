@@ -147,14 +147,15 @@ export default function SearchPage() {
     }
   }
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
-  }
+  const getInitials = (name?: string) => {
+  if (!name) return "??"
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+}
 
   return (
     <div className="min-h-screen bg-gray-50">

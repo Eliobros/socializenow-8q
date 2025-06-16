@@ -29,84 +29,73 @@ export async function GET(request: NextRequest) {
     const client = await clientPromise
     const db = client.db("socializenow")
     const posts = db.collection("posts")
-    const users = db.collection("users")
 
-    // Get posts with author information
-    const postsList = await posts
-      .aggregate([
-        {
-          $lookup: {
-            from: "users",
-            localField: "authorId",
-            foreignField: "_id",
-            as: "author",
-          },
+    const userId = new ObjectId(user.userId)
+
+    const postsList = await posts.aggregate([
+      {
+        $lookup: {
+          from: "users",
+          localField: "authorId",
+          foreignField: "_id",
+          as: "author",
         },
-        {
-          $lookup: {
-            from: "profiles",
-            localField: "authorId",
-            foreignField: "userId",
-            as: "profile",
-          },
+      },
+      {
+        $lookup: {
+          from: "profiles",
+          localField: "authorId",
+          foreignField: "userId",
+          as: "profile",
         },
-        {
-          $unwind: "$author",
+      },
+      {
+        $unwind: "$author",
+      },
+      {
+        $lookup: {
+          from: "likes",
+          let: { postId: "$_id" },
+          pipeline: [
+            { 
+              $match: { 
+                $expr: { 
+                  $and: [
+                    { $eq: ["$postId", "$$postId"] },
+                    { $eq: ["$userId", userId] }
+                  ] 
+                } 
+              } 
+            },
+          ],
+          as: "userLiked",
+        }
+      },
+      {
+        $addFields: {
+          likedByUser: { $gt: [{ $size: "$userLiked" }, 0] }
+        }
+      },
+      {
+        $project: {
+          content: 1,
+          createdAt: 1,
+          likes: 1,
+          likedByUser: 1,
+          "author._id": 1,
+          "author.name": 1,
+          "author.email": 1,
+          "author.avatar": { $arrayElemAt: ["$profile.avatar", 0] },
         },
-        {
-          $project: {
-            content: 1,
-            createdAt: 1,
-            likes: 1,
-            "author._id": 1,
-            "author.name": 1,
-            "author.email": 1,
-            "author.avatar": { $arrayElemAt: ["$profile.avatar", 0] },
-          },
-        },
-        {
-          $sort: { createdAt: -1 },
-        },
-      ])
-      .toArray()
+      },
+      {
+        $sort: { createdAt: -1 }
+      }
+    ]).toArray()
 
     return NextResponse.json({ posts: postsList })
   } catch (error) {
     console.error("Get posts error:", error)
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const user = verifyToken(request)
-    if (!user) {
-      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
-    }
-
-    const { content } = await request.json()
-
-    if (!content || content.trim().length === 0) {
-      return NextResponse.json({ error: "Conteúdo do post é obrigatório" }, { status: 400 })
-    }
-
-    const client = await clientPromise
-    const db = client.db("socializenow")
-    const posts = db.collection("posts")
-
-    const result = await posts.insertOne({
-      content: content.trim(),
-      authorId: new ObjectId(user.userId),
-      createdAt: new Date(),
-      likes: 0,
-    })
-
-    return NextResponse.json({
-      message: "Post criado com sucesso",
-      postId: result.insertedId,
-    })
-  } catch (error) {
-    console.error("Create post error:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }

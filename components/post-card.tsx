@@ -18,6 +18,7 @@ interface Post {
   }
   createdAt: string
   likes: number
+  likedByUser: boolean  // Novo campo vindo do backend
 }
 
 interface PostCardProps {
@@ -25,7 +26,7 @@ interface PostCardProps {
 }
 
 export function PostCard({ post }: PostCardProps) {
-  const [liked, setLiked] = useState(false)
+  const [liked, setLiked] = useState(post.likedByUser)
   const [likeCount, setLikeCount] = useState(post.likes || 0)
   const [isLiking, setIsLiking] = useState(false)
 
@@ -50,7 +51,7 @@ export function PostCard({ post }: PostCardProps) {
   }
 
   const handleLike = async () => {
-    if (isLiking) return
+    if (isLiking || liked) return // Impede curtir várias vezes
 
     setIsLiking(true)
     try {
@@ -100,7 +101,7 @@ export function PostCard({ post }: PostCardProps) {
             size="sm"
             className={`gap-2 ${liked ? "text-red-600" : "text-gray-600 hover:text-red-600"}`}
             onClick={handleLike}
-            disabled={isLiking}
+            disabled={isLiking || liked} // Desativa botão se já curtiu
           >
             <Heart className={`h-4 w-4 ${liked ? "fill-current" : ""}`} />
             {likeCount}
