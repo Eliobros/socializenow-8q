@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-
+import { Analytics } from "@vercel/analytics/next"
 export const metadata: Metadata = {
   title: "SocializeNow - Conecte-se com o mundo",
   description: "Rede social para conectar pessoas e compartilhar momentos.",
@@ -41,7 +41,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt">
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+        </body>
     </html>
   );
 }
