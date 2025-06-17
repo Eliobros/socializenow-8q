@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea"
 import { Heart, MessageCircle, Share, Send } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 interface Post {
   _id: string
@@ -24,6 +24,17 @@ interface Post {
   commentsCount?: number
 }
 
+interface Comment {
+  _id: string
+  content: string
+  createdAt: string
+  author: {
+    _id: string
+    name: string
+    avatar?: string
+  }
+}
+
 interface PostCardProps {
   post: Post
 }
@@ -35,7 +46,10 @@ export function PostCard({ post }: PostCardProps) {
   const [comment, setComment] = useState("")
   const [isCommenting, setIsCommenting] = useState(false)
   const [showShareDialog, setShowShareDialog] = useState(false)
+  const [showCommentsDialog, setShowCommentsDialog] = useState(false)
+  const [comments, setComments] = useState<Comment[]>([])
 
+  // Pega as iniciais do nome para avatar fallback
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -45,6 +59,7 @@ export function PostCard({ post }: PostCardProps) {
       .slice(0, 2)
   }
 
+  // Formata data
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("pt-BR", {
@@ -56,6 +71,27 @@ export function PostCard({ post }: PostCardProps) {
     })
   }
 
+  // Busca os comentários ao abrir o diálogo
+  useEffect(() => {
+    if (showCommentsDialog) {
+      fetchComments()
+    }
+  }, [showCommentsDialog])
+
+  // Função pra buscar os comentários
+  const fetchComments = async () => {
+    try {
+      const res = await fetch(`/api/posts/${post._id}/comments`)
+      if (res.ok) {
+        const data = await res.json()
+        setComments(data.comments || [])
+      }
+    } catch (error) {
+      console.error("Erro ao carregar comentários:", error)
+    }
+  }
+
+  // Curtir/descurtir post
   const handleLike = async () => {
     if (isLiking) return
 
@@ -81,6 +117,7 @@ export function PostCard({ post }: PostCardProps) {
     }
   }
 
+  // Enviar novo comentário
   const handleComment = async () => {
     if (!comment.trim() || isCommenting) return
 
@@ -98,7 +135,7 @@ export function PostCard({ post }: PostCardProps) {
 
       if (response.ok) {
         setComment("")
-        // Aqui você pode atualizar a lista de comentários ou recarregar o post
+        fetchComments() // Atualiza a lista
       }
     } catch (error) {
       console.error("Error commenting:", error)
@@ -106,44 +143,45 @@ export function PostCard({ post }: PostCardProps) {
       setIsCommenting(false)
     }
   }
-const handleShare = async (platform: string) => {
-  if (typeof window === "undefined") return; // garantir que está no client
 
-  const postUrl = `${window.location.origin}/post/${post._id}`
-  const text = `Confira este post no SocializeNow: ${post.content.substring(0, 100)}...`
+  // Compartilhar em redes sociais
+  const handleShare = async (platform: string) => {
+    if (typeof window === "undefined") return
 
-  try {
-    switch (platform) {
-      case "copy":
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(postUrl)
-          alert("Link copiado!")
-        } else {
-          alert("Funcionalidade de copiar não suportada neste navegador.")
-        }
-        break
-      case "whatsapp":
-        window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + postUrl)}`)
-        break
-      case "twitter":
-        window.open(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(postUrl)}`
-        )
-        break
-      case "facebook":
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`)
-        break
-      default:
-        alert("Plataforma de compartilhamento não suportada.")
+    const postUrl = `${window.location.origin}/post/${post._id}`
+    const text = `Confira este post no SocializeNow: ${post.content.substring(0, 100)}...`
+
+    try {
+      switch (platform) {
+        case "copy":
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(postUrl)
+            alert("Link copiado!")
+          } else {
+            alert("Funcionalidade de copiar não suportada neste navegador.")
+          }
+          break
+        case "whatsapp":
+          window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + postUrl)}`)
+          break
+        case "twitter":
+          window.open(
+            `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(postUrl)}`
+          )
+          break
+        case "facebook":
+          window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`)
+          break
+        default:
+          alert("Plataforma de compartilhamento não suportada.")
+      }
+    } catch (error) {
+      console.error("Erro ao compartilhar:", error)
+      alert("Erro ao tentar compartilhar o link.")
     }
-  } catch (error) {
-    console.error("Erro ao compartilhar:", error)
-    alert("Erro ao tentar compartilhar o link.")
+
+    setShowShareDialog(false)
   }
-
-  setShowShareDialog(false)
-}
-
 
   return (
     <Card>
@@ -177,33 +215,50 @@ const handleShare = async (platform: string) => {
             {likeCount}
           </Button>
 
-          <Dialog>
+          <Dialog open={showCommentsDialog} onOpenChange={setShowCommentsDialog}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-blue-600">
                 <MessageCircle className="h-4 w-4" />
-                Comentar
+                {comments.length > 0 ? `${comments.length} Comentário(s)` : "Comentar"}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Comentar no post</DialogTitle>
+                <DialogTitle>Comentários</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm">{post.content}</p>
-                </div>
-                <div className="space-y-2">
-                  <Textarea
-                    placeholder="Escreva seu comentário..."
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    rows={3}
-                  />
-                  <Button onClick={handleComment} disabled={!comment.trim() || isCommenting} className="w-full">
-                    {isCommenting ? "Comentando..." : "Comentar"}
-                    <Send className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
+              <div className="space-y-4 max-h-80 overflow-y-auto">
+                {comments.length > 0 ? (
+                  comments.map((c) => (
+                    <div key={c._id} className="p-3 bg-muted rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <Avatar className="h-6 w-6">
+                          {c.author.avatar ? (
+                            <AvatarImage src={c.author.avatar} alt={c.author.name} />
+                          ) : null}
+                          <AvatarFallback>{c.author.name[0]}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <strong className="text-sm">{c.author.name}</strong>
+                          <p className="text-sm mt-1">{c.content}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nenhum comentário ainda.</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Textarea
+                  placeholder="Escreva seu comentário..."
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  rows={3}
+                />
+                <Button onClick={handleComment} disabled={!comment.trim() || isCommenting} className="w-full">
+                  {isCommenting ? "Enviando..." : "Enviar Comentário"}
+                  <Send className="ml-2 h-4 w-4" />
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -240,4 +295,3 @@ const handleShare = async (platform: string) => {
     </Card>
   )
 }
-

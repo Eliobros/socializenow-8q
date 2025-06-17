@@ -1,3 +1,5 @@
+// Arquivo: app/api/posts/[postId]/comments/route.ts
+
 import { type NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
@@ -19,10 +21,79 @@ function verifyToken(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest, context: { params: Promise<{ postId: string }> }) {
+// ✅ Função GET: Busca todos os comentários de um post
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ postId: string }> }
+) {
   try {
-    const params = await context.params
-    const postId = params.postId
+    const user = verifyToken(request)
+    if (!user) {
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
+    }
+
+    const { postId } = await params
+
+    if (!postId || !ObjectId.isValid(postId)) {
+      return NextResponse.json({ error: "ID do post inválido" }, { status: 400 })
+    }
+
+    const client = await clientPromise
+    const db = client.db("socializenow")
+    const commentsCollection = db.collection("comments")
+    const usersCollection = db.collection("users")
+
+    // Buscar os comentários + dados do autor
+    const comments = await commentsCollection
+      .aggregate([
+        {
+          $match: {
+            postId: new ObjectId(postId),
+          },
+        },
+        {
+          $lookup: {
+            from: "users",
+            localField: "authorId",
+            foreignField: "_id",
+            as: "author",
+          },
+        },
+        {
+          $unwind: "$author",
+        },
+        {
+          $project: {
+            content: 1,
+            createdAt: 1,
+            "author._id": 1,
+            "author.name": 1,
+            "author.avatar": 1,
+          },
+        },
+        {
+          $sort: {
+            createdAt: 1, // Do mais antigo para o mais recente
+          },
+        },
+      ])
+      .toArray()
+
+    return NextResponse.json({ comments })
+  } catch (error) {
+    console.error("Erro ao buscar comentários:", error)
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+  }
+}
+
+// ✅ Função POST: Cria novo comentário (já existe)
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ postId: string }> }
+) {
+  try {
+    const paramsData = await params
+    const postId = paramsData.postId
 
     const user = verifyToken(request)
     if (!user) {
@@ -91,4 +162,3 @@ export async function POST(request: NextRequest, context: { params: Promise<{ po
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
-
