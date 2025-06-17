@@ -100,37 +100,32 @@ export default function NotificationsPage() {
   }
 
   const handleNotificationClick = async (notification: Notification) => {
-  if (!notification.read) {
-    await markAsRead(notification._id);
-  }
-
-  switch (notification.type) {
-    case "follow": {
-      // Pega o id de quem seguiu, tentando vários campos possíveis
-      const userId = notification.from?._id || notification.userId || notification.fromUserId;
-      if (userId) {
-        router.push(`/profile/${userId}`);
-      } else {
-        console.warn("ID do usuário não encontrado na notificação de follow:", notification);
-      }
-      break;
+    // Marcar como lida se não estiver
+    if (!notification.read) {
+      await markAsRead(notification._id)
     }
-    case "like":
-    case "comment":
-      if (notification.postId) {
-        router.push(`/post/${notification.postId}`);
-      }
-      break;
-    case "mention":
-      if (notification.targetUrl) {
-        router.push(notification.targetUrl);
-      }
-      break;
-    default:
-      break;
-  }
-}
 
+    // Navegar baseado no tipo de notificação
+    switch (notification.type) {
+      case "follow":
+        router.push(`/profile/${notification.from._id}`)
+        break
+      case "like":
+      case "comment":
+        if (notification.postId) {
+          // Por enquanto, vamos para o feed já que não temos página individual de post
+          router.push(`/feed`)
+        }
+        break
+      case "mention":
+        if (notification.targetUrl) {
+          router.push(notification.targetUrl)
+        }
+        break
+      default:
+        break
+    }
+  }
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -264,3 +259,4 @@ export default function NotificationsPage() {
     </div>
   )
 }
+

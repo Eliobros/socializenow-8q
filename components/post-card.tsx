@@ -106,30 +106,44 @@ export function PostCard({ post }: PostCardProps) {
       setIsCommenting(false)
     }
   }
+const handleShare = async (platform: string) => {
+  if (typeof window === "undefined") return; // garantir que está no client
 
-  const handleShare = async (platform: string) => {
-    const postUrl = `${window.location.origin}/post/${post._id}`
-    const text = `Confira este post no SocializeNow: ${post.content.substring(0, 100)}...`
+  const postUrl = `${window.location.origin}/post/${post._id}`
+  const text = `Confira este post no SocializeNow: ${post.content.substring(0, 100)}...`
 
+  try {
     switch (platform) {
       case "copy":
-        await navigator.clipboard.writeText(postUrl)
-        alert("Link copiado!")
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(postUrl)
+          alert("Link copiado!")
+        } else {
+          alert("Funcionalidade de copiar não suportada neste navegador.")
+        }
         break
       case "whatsapp":
         window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + postUrl)}`)
         break
       case "twitter":
         window.open(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(postUrl)}`,
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(postUrl)}`
         )
         break
       case "facebook":
         window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`)
         break
+      default:
+        alert("Plataforma de compartilhamento não suportada.")
     }
-    setShowShareDialog(false)
+  } catch (error) {
+    console.error("Erro ao compartilhar:", error)
+    alert("Erro ao tentar compartilhar o link.")
   }
+
+  setShowShareDialog(false)
+}
+
 
   return (
     <Card>
@@ -226,3 +240,4 @@ export function PostCard({ post }: PostCardProps) {
     </Card>
   )
 }
+

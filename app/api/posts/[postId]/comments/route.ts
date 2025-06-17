@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
@@ -14,17 +14,15 @@ function verifyToken(request: NextRequest) {
   const token = authHeader.substring(7)
   try {
     return jwt.verify(token, JWT_SECRET) as any
-  } catch {
+  } catch (error) {
     return null
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { postId: string } }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ postId: string }> }) {
   try {
-    const { postId } = params
+    const params = await context.params
+    const postId = params.postId
 
     const user = verifyToken(request)
     if (!user) {
@@ -42,12 +40,21 @@ export async function POST(
     const comments = db.collection("comments")
     const posts = db.collection("posts")
     const notifications = db.collection("notifications")
+    const users = db.collection("users")
 
+    // Verificar se o post existe
     const post = await posts.findOne({ _id: new ObjectId(postId) })
     if (!post) {
       return NextResponse.json({ error: "Post não encontrado" }, { status: 404 })
     }
 
+    // Buscar dados do usuário atual
+    const currentUser = await users.findOne({ _id: new ObjectId(user.userId) })
+    if (!currentUser) {
+      return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
+    }
+
+    // Criar comentário
     const comment = {
       postId: new ObjectId(postId),
       authorId: new ObjectId(user.userId),
@@ -57,16 +64,17 @@ export async function POST(
 
     const result = await comments.insertOne(comment)
 
+    // Criar notificação para o autor do post (se não for o próprio usuário)
     if (post.authorId.toString() !== user.userId) {
       await notifications.insertOne({
         userId: post.authorId,
         type: "comment",
-        message: `${user.name} comentou no seu post`,
+        message: `${currentUser.name} comentou no seu post`,
         from: {
           _id: new ObjectId(user.userId),
-          name: user.name,
-          username: user.username || "",
-          avatar: user.avatar || "",
+          name: currentUser.name,
+          username: currentUser.username || "",
+          avatar: currentUser.avatar || "",
         },
         postId: new ObjectId(postId),
         read: false,
@@ -79,7 +87,8 @@ export async function POST(
       commentId: result.insertedId,
     })
   } catch (error) {
-    console.error("Erro ao adicionar comentário:", error)
+    console.error("Add comment error:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
+
