@@ -1,4 +1,3 @@
-import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
@@ -8,7 +7,24 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "SocializeNow - Conecte-se com o mundo",
-  description: "A rede social que conecta pessoas ao redor do mundo",
+  description: "A rede social que conecta pessoas ao redor do mundo.",
+  openGraph: {
+    title: "SocializeNow - Conecte-se com o mundo",
+    description: "A rede social que conecta pessoas ao redor do mundo.",
+    url: "https://seusite.com", // troque pelo seu domínio
+    siteName: "SocializeNow",
+    locale: "pt_BR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SocializeNow - Conecte-se com o mundo",
+    description: "A rede social que conecta pessoas ao redor do mundo.",
+    creator: "@seuuser", // se tiver Twitter
+  },
+  icons: {
+    icon: "/socializenow.png",
+  },
 }
 
 export default function RootLayout({
@@ -18,12 +34,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <meta charSet="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/favicon.ico" />
+      </head>
       <body className={`${inter.className} pb-16 md:pb-0`}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
         </ThemeProvider>
       </body>
     </html>
   )
 }
-
