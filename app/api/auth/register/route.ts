@@ -7,9 +7,9 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, password } = await request.json()
+    const { name, email, username, password } = await request.json()
 
-    if (!name || !email || !password) {
+    if (!name || !email || !username || !password) {
       return NextResponse.json({ error: "Todos os campos são obrigatórios" }, { status: 400 })
     }
 
@@ -21,29 +21,28 @@ export async function POST(request: NextRequest) {
     const db = client.db("socializenow")
     const users = db.collection("users")
 
-    // Check if user already exists
-    const existingUser = await users.findOne({ email })
+    // Verificar se já existe usuário com o mesmo e-mail ou username
+    const existingUser = await users.findOne({ $or: [{ email }, { username }] })
     if (existingUser) {
-      return NextResponse.json({ error: "Usuário já existe com este email" }, { status: 400 })
+      return NextResponse.json({ error: "Email ou nome de usuário já está em uso" }, { status: 400 })
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    // Create user
     const result = await users.insertOne({
       name,
       email,
+      username,
       password: hashedPassword,
       createdAt: new Date(),
     })
 
-    // Generate JWT token
     const token = jwt.sign(
       {
         userId: result.insertedId,
         email,
         name,
+        username,
       },
       JWT_SECRET,
       { expiresIn: "7d" },
@@ -56,6 +55,7 @@ export async function POST(request: NextRequest) {
         id: result.insertedId,
         name,
         email,
+        username,
       },
     })
   } catch (error) {

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "SocializeNow - Conecte-se com o mundo",
     description: "A rede social que conecta pessoas ao redor do mundo.",
-    url: "https://seusite.com", // troque pelo seu domínio
+    url: "https://socializenow.onrender.com", // troque pelo seu domínio
     siteName: "SocializeNow",
     locale: "pt_BR",
     type: "website",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     creator: "@seuuser", // se tiver Twitter
   },
   icons: {
-    icon: "/socializenow.png",
+    icon: "/soocializenow.png",
   },
 }
 
@@ -38,6 +38,7 @@ export default function RootLayout({
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
+	<link rel="manifest" href="https://progressier.app/WqR446EWpW6NmDDNQwu9/progressier.json"/><script defer src="https://progressier.app/WqR446EWpW6NmDDNQwu9/script.js"></script> 
       </head>
       <body className={`${inter.className} pb-16 md:pb-0`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

@@ -97,31 +97,37 @@ export default function UserProfilePage({ params }: { params: { userId: string }
   }
 
   const handleFollow = async () => {
-    try {
-      const token = localStorage.getItem("token")
-      const response = await fetch("/api/follow", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ targetUserId: params.userId }),
-      })
+  try {
+    const token = localStorage.getItem("token")
+    const response = await fetch("/api/follow", {
+      method: following ? "DELETE" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userId: params.userId }),
+    })
 
-      if (response.ok) {
-        const data = await response.json()
-        setFollowing(data.following)
-        if (profile) {
-          setProfile({
-            ...profile,
-            followers: data.following ? profile.followers + 1 : profile.followers - 1,
-          })
-        }
+    if (response.ok) {
+      const data = await response.json()
+
+      // Atualize diretamente com os dados retornados da API
+      setFollowing(data.following)
+      if (profile) {
+        setProfile({
+          ...profile,
+          followers: data.followers, // <- use o valor retornado da API!
+        })
       }
-    } catch (error) {
-      console.error("Error following user:", error)
+    } else {
+      const data = await response.json()
+      setError(data.error || "Erro ao seguir usuário")
     }
+  } catch (error) {
+    console.error("Erro ao seguir usuário:", error)
+    setError("Erro ao seguir usuário")
   }
+}
 
   const handleMessage = () => {
     router.push(`/messages?user=${params.userId}`)

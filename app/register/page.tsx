@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -16,6 +15,7 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    username: "",
     password: "",
     confirmPassword: "",
   })
@@ -48,6 +48,7 @@ export default function RegisterPage() {
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
+          username: formData.username,
           password: formData.password,
         }),
       })
@@ -104,6 +105,18 @@ export default function RegisterPage() {
                 placeholder="seu@email.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="username">Nome de usuário</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="ex: habibo_dev"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 required
               />
             </div>
