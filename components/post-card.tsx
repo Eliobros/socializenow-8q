@@ -12,6 +12,7 @@ import { useState, useEffect } from "react"
 interface Post {
   _id: string
   content: string
+  image?: string
   author: {
     name: string
     email: string
@@ -205,7 +206,18 @@ export function PostCard({ post }: PostCardProps) {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <p className="mb-4 whitespace-pre-wrap">{post.content}</p>
+        {post.content && <p className="mb-4 whitespace-pre-wrap">{post.content}</p>}
+
+        {post.image && (
+          <div className="mb-4">
+            <img
+              src={post.image || "/placeholder.svg"}
+              alt="Post image"
+              className="w-full max-h-96 object-cover rounded-lg"
+            />
+          </div>
+        )}
+
         <div className="flex items-center gap-4 pt-2 border-t">
           <Button
             variant="ghost"

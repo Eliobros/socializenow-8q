@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
+import { writeFile, mkdir } from "fs/promises"
+import { join } from "path"
 import clientPromise from "@/lib/mongodb"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
@@ -77,6 +79,7 @@ export async function GET(request: NextRequest) {
         {
           $project: {
             content: 1,
+            image: 1,
             createdAt: 1,
             likes: 1,
             likedByUser: 1,
@@ -108,23 +111,73 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Token inválido" }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { content } = body
+    const contentType = request.headers.get("content-type")
+    let content = ""
+    let imagePath = ""
 
-    if (!content || typeof content !== "string") {
-      return NextResponse.json({ error: "Conteúdo inválido" }, { status: 400 })
+    if (contentType?.includes("multipart/form-data")) {
+      // Post com imagem
+      const formData = await request.formData()
+      content = (formData.get("content") as string) || ""
+      const image = formData.get("image") as File
+
+      if (!image && !content.trim()) {
+        return NextResponse.json({ error: "Conteúdo ou imagem é obrigatório" }, { status: 400 })
+      }
+
+      if (image) {
+        // Validar arquivo
+        if (!image.type.startsWith("image/")) {
+          return NextResponse.json({ error: "Apenas arquivos de imagem são permitidos" }, { status: 400 })
+        }
+
+        if (image.size > 5 * 1024 * 1024) {
+          return NextResponse.json({ error: "A imagem deve ter no máximo 5MB" }, { status: 400 })
+        }
+
+        // Salvar imagem
+        const timestamp = Date.now()
+        const extension = image.name.split(".").pop()
+        const filename = `${user.userId}_${timestamp}.${extension}`
+
+        const uploadDir = join(process.cwd(), "public", "post_photos")
+        try {
+          await mkdir(uploadDir, { recursive: true })
+        } catch (error) {
+          // Directory might already exist
+        }
+
+        const bytes = await image.arrayBuffer()
+        const buffer = Buffer.from(bytes)
+        const filepath = join(uploadDir, filename)
+        await writeFile(filepath, buffer)
+
+        imagePath = `/post_photos/${filename}`
+      }
+    } else {
+      // Post apenas texto
+      const body = await request.json()
+      content = body.content
+
+      if (!content || typeof content !== "string" || !content.trim()) {
+        return NextResponse.json({ error: "Conteúdo inválido" }, { status: 400 })
+      }
     }
 
     const client = await clientPromise
     const db = client.db("socializenow")
     const posts = db.collection("posts")
 
-    const newPost = {
+    const newPost: any = {
       authorId: new ObjectId(user.userId),
-      content,
+      content: content.trim(),
       createdAt: new Date(),
       likes: 0,
       commentsCount: 0,
+    }
+
+    if (imagePath) {
+      newPost.image = imagePath
     }
 
     const result = await posts.insertOne(newPost)

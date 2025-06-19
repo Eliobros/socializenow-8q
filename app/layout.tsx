@@ -26,6 +26,7 @@ export const metadata: Metadata = {
   icons: {
     icon: "/soocializenow.png",
   },
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({

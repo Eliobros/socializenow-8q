@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { PostCard } from "@/components/post-card"
@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Plus } from "lucide-react"
+import { Loader2, Plus, ImageIcon, X } from "lucide-react"
 
 interface Post {
   _id: string
   content: string
+  image?: string
   author: {
     name: string
     email: string
@@ -26,9 +27,12 @@ interface Post {
 export default function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [newPost, setNewPost] = useState("")
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -62,27 +66,88 @@ export default function FeedPage() {
     }
   }
 
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith("image/")) {
+      setError("Por favor, selecione apenas arquivos de imagem")
+      return
+    }
+
+    // Validar tamanho (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setError("A imagem deve ter no máximo 5MB")
+      return
+    }
+
+    setSelectedImage(file)
+
+    // Criar preview
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const removeImage = () => {
+    setSelectedImage(null)
+    setImagePreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newPost.trim()) return
+    if (!newPost.trim() && !selectedImage) return
 
     setPosting(true)
+    setError("")
+
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("/api/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ content: newPost }),
-      })
 
-      if (response.ok) {
-        setNewPost("")
-        fetchPosts()
+      if (selectedImage) {
+        // Post com imagem
+        const formData = new FormData()
+        formData.append("content", newPost)
+        formData.append("image", selectedImage)
+
+        const response = await fetch("/api/posts", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        })
+
+        if (response.ok) {
+          setNewPost("")
+          removeImage()
+          fetchPosts()
+        } else {
+          setError("Erro ao criar post")
+        }
       } else {
-        setError("Erro ao criar post")
+        // Post apenas texto
+        const response = await fetch("/api/posts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ content: newPost }),
+        })
+
+        if (response.ok) {
+          setNewPost("")
+          fetchPosts()
+        } else {
+          setError("Erro ao criar post")
+        }
       }
     } catch (error) {
       setError("Erro de conexão")
@@ -128,10 +193,46 @@ export default function FeedPage() {
                 rows={3}
                 className="resize-none"
               />
-              <Button type="submit" disabled={posting || !newPost.trim()}>
-                {posting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Publicar
-              </Button>
+
+              {imagePreview && (
+                <div className="relative">
+                  <img
+                    src={imagePreview || "/placeholder.svg"}
+                    alt="Preview"
+                    className="w-full max-h-64 object-cover rounded-lg"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-2 right-2"
+                    onClick={removeImage}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="flex gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                    <ImageIcon className="h-4 w-4 mr-2" />
+                    Foto
+                  </Button>
+                </div>
+
+                <Button type="submit" disabled={posting || (!newPost.trim() && !selectedImage)}>
+                  {posting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Publicar
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>

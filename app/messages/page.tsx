@@ -35,6 +35,8 @@ interface Conversation {
     _id: string
     name: string
     avatar: string
+    lastSeen?: string
+    isOnline?: boolean
   }>
   lastMessage: {
     content: string
@@ -49,6 +51,8 @@ interface User {
   name: string
   username: string
   avatar: string
+  lastSeen?: string
+  isOnline?: boolean
 }
 
 export default function MessagesPage() {
@@ -251,6 +255,19 @@ export default function MessagesPage() {
     })
   }
 
+  const formatLastSeen = (lastSeen?: string) => {
+    if (!lastSeen) return "Offline"
+
+    const now = new Date()
+    const lastSeenDate = new Date(lastSeen)
+    const diffInMinutes = Math.floor((now.getTime() - lastSeenDate.getTime()) / (1000 * 60))
+
+    if (diffInMinutes < 1) return "Online"
+    if (diffInMinutes < 60) return `Visto há ${diffInMinutes} min`
+    if (diffInMinutes < 1440) return `Visto há ${Math.floor(diffInMinutes / 60)}h`
+    return `Visto há ${Math.floor(diffInMinutes / 1440)} dias`
+  }
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -285,9 +302,9 @@ export default function MessagesPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Lista de Conversas */}
-          <Card className="lg:col-span-1">
+          <Card className="lg:col-span-1 h-[calc(100vh-200px)]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="flex items-center gap-2">
                 <MessageCircle className="h-5 w-5" />
@@ -324,14 +341,20 @@ export default function MessagesPage() {
                             className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
                             onClick={() => startNewConversation(user._id)}
                           >
-                            <Avatar className="h-10 w-10">
-                              <AvatarFallback className="bg-blue-600 text-white">
-                                {getInitials(user.name)}
-                              </AvatarFallback>
-                            </Avatar>
+                            <div className="relative">
+                              <Avatar className="h-10 w-10">
+                                <AvatarFallback className="bg-blue-600 text-white">
+                                  {getInitials(user.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              {user.isOnline && (
+                                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                              )}
+                            </div>
                             <div>
                               <p className="font-medium">{user.name}</p>
                               {user.username && <p className="text-sm text-gray-500">@{user.username}</p>}
+                              <p className="text-xs text-gray-400">{formatLastSeen(user.lastSeen)}</p>
                             </div>
                           </div>
                         ))}
@@ -341,8 +364,8 @@ export default function MessagesPage() {
                 </DialogContent>
               </Dialog>
             </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[500px]">
+            <CardContent className="p-0 flex-1">
+              <ScrollArea className="h-[calc(100vh-300px)]">
                 {conversations.length === 0 ? (
                   <div className="text-center py-8 px-4">
                     <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -365,11 +388,16 @@ export default function MessagesPage() {
                         }}
                       >
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-12 w-12">
-                            <AvatarFallback className="bg-blue-600 text-white">
-                              {getInitials(otherParticipant.name)}
-                            </AvatarFallback>
-                          </Avatar>
+                          <div className="relative">
+                            <Avatar className="h-12 w-12">
+                              <AvatarFallback className="bg-blue-600 text-white">
+                                {getInitials(otherParticipant.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            {otherParticipant.isOnline && (
+                              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                            )}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <p className="font-medium truncate">{otherParticipant.name}</p>
@@ -378,6 +406,7 @@ export default function MessagesPage() {
                               </span>
                             </div>
                             <p className="text-sm text-gray-600 truncate">{conversation.lastMessage.content}</p>
+                            <p className="text-xs text-gray-400">{formatLastSeen(otherParticipant.lastSeen)}</p>
                           </div>
                           {conversation.unreadCount > 0 && (
                             <div className="bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -394,19 +423,41 @@ export default function MessagesPage() {
           </Card>
 
           {/* Área de Mensagens */}
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2 h-[calc(100vh-200px)] flex flex-col">
             {selectedConversation ? (
               <>
-                <CardHeader className="border-b">
+                <CardHeader className="border-b flex-shrink-0">
                   <CardTitle>
                     {(() => {
                       const conversation = conversations.find((c) => c._id === selectedConversation)
                       const otherParticipant = conversation ? getOtherParticipant(conversation) : null
-                      return otherParticipant ? otherParticipant.name : "Conversa"
+                      return (
+                        <div className="flex items-center gap-3">
+                          {otherParticipant && (
+                            <>
+                              <div className="relative">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarFallback className="bg-blue-600 text-white">
+                                    {getInitials(otherParticipant.name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                {otherParticipant.isOnline && (
+                                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-semibold">{otherParticipant.name}</p>
+                                <p className="text-sm text-gray-500">{formatLastSeen(otherParticipant.lastSeen)}</p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )
                     })()}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-0 flex flex-col h-[500px]">
+
+                <CardContent className="p-0 flex flex-col flex-1 min-h-0">
                   <ScrollArea className="flex-1 p-4">
                     <div className="space-y-4">
                       {messages.map((message) => (
@@ -436,13 +487,14 @@ export default function MessagesPage() {
                     </div>
                   </ScrollArea>
 
-                  <div className="border-t p-4">
+                  <div className="border-t p-4 flex-shrink-0">
                     <form onSubmit={sendMessage} className="flex gap-2">
                       <Input
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         placeholder="Digite sua mensagem..."
                         className="flex-1"
+                        disabled={sending}
                       />
                       <Button type="submit" disabled={sending || !newMessage.trim()}>
                         {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -452,7 +504,7 @@ export default function MessagesPage() {
                 </CardContent>
               </>
             ) : (
-              <CardContent className="flex items-center justify-center h-[500px]">
+              <CardContent className="flex items-center justify-center h-full">
                 <div className="text-center">
                   <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500">Selecione uma conversa para começar</p>
