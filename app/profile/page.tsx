@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Edit, MessageSquare, Settings, Shield, Camera } from "lucide-react"
+import { Loader2, Edit, MessageSquare, Settings, Shield, Camera, CheckCircle } from "lucide-react"
 
 interface UserProfile {
   _id: string
@@ -26,6 +26,7 @@ interface UserProfile {
   following: number
   postsCount: number
   createdAt: string
+  isVerified: boolean
 }
 
 interface Post {
@@ -308,7 +309,10 @@ export default function ProfilePage() {
               </div>
 
               <div className="flex-1 text-center md:text-left">
-                <h1 className="text-3xl font-bold mb-2">{profile.name}</h1>
+                <h1 className="text-3xl font-bold mb-2">
+                  {profile.name}
+                  {profile.isVerified && <CheckCircle className="inline-block h-5 w-5 text-blue-500 ml-2" />}
+                </h1>
                 {profile.username && <p className="text-gray-600 mb-2">@{profile.username}</p>}
                 {profile.bio && <p className="text-gray-700 mb-4">{profile.bio}</p>}
 

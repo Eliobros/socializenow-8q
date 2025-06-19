@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
       avatar: userProfile.avatar || "",
       followers: userProfile.followers || 0,
       following: userProfile.following || 0,
+      isVerified: userProfile.isVerified || false,
       postsCount,
     }
 

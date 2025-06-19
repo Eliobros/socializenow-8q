@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Heart, MessageCircle, Share, Send } from "lucide-react"
+import { Heart, MessageCircle, Share, Send, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 
@@ -17,11 +17,12 @@ interface Post {
     email: string
     _id: string
     avatar?: string
+    isVerified?: boolean
   }
   createdAt: string
   likes: number
   likedByUser: boolean
-  commentsCount?: number
+  commentsCount: number
 }
 
 interface Comment {
@@ -42,6 +43,7 @@ interface PostCardProps {
 export function PostCard({ post }: PostCardProps) {
   const [liked, setLiked] = useState(post.likedByUser)
   const [likeCount, setLikeCount] = useState(post.likes || 0)
+  const [commentCount, setCommentCount] = useState(post.commentsCount || 0)
   const [isLiking, setIsLiking] = useState(false)
   const [comment, setComment] = useState("")
   const [isCommenting, setIsCommenting] = useState(false)
@@ -49,7 +51,6 @@ export function PostCard({ post }: PostCardProps) {
   const [showCommentsDialog, setShowCommentsDialog] = useState(false)
   const [comments, setComments] = useState<Comment[]>([])
 
-  // Pega as iniciais do nome para avatar fallback
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -59,7 +60,6 @@ export function PostCard({ post }: PostCardProps) {
       .slice(0, 2)
   }
 
-  // Formata data
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("pt-BR", {
@@ -71,17 +71,20 @@ export function PostCard({ post }: PostCardProps) {
     })
   }
 
-  // Busca os comentários ao abrir o diálogo
   useEffect(() => {
     if (showCommentsDialog) {
       fetchComments()
     }
   }, [showCommentsDialog])
 
-  // Função pra buscar os comentários
   const fetchComments = async () => {
     try {
-      const res = await fetch(`/api/posts/${post._id}/comments`)
+      const token = localStorage.getItem("token")
+      const res = await fetch(`/api/posts/${post._id}/comments`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
       if (res.ok) {
         const data = await res.json()
         setComments(data.comments || [])
@@ -91,7 +94,6 @@ export function PostCard({ post }: PostCardProps) {
     }
   }
 
-  // Curtir/descurtir post
   const handleLike = async () => {
     if (isLiking) return
 
@@ -117,7 +119,6 @@ export function PostCard({ post }: PostCardProps) {
     }
   }
 
-  // Enviar novo comentário
   const handleComment = async () => {
     if (!comment.trim() || isCommenting) return
 
@@ -135,7 +136,8 @@ export function PostCard({ post }: PostCardProps) {
 
       if (response.ok) {
         setComment("")
-        fetchComments() // Atualiza a lista
+        setCommentCount((prev) => prev + 1)
+        fetchComments()
       }
     } catch (error) {
       console.error("Error commenting:", error)
@@ -144,7 +146,6 @@ export function PostCard({ post }: PostCardProps) {
     }
   }
 
-  // Compartilhar em redes sociais
   const handleShare = async (platform: string) => {
     if (typeof window === "undefined") return
 
@@ -166,14 +167,12 @@ export function PostCard({ post }: PostCardProps) {
           break
         case "twitter":
           window.open(
-            `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(postUrl)}`
+            `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(postUrl)}`,
           )
           break
         case "facebook":
           window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(postUrl)}`)
           break
-        default:
-          alert("Plataforma de compartilhamento não suportada.")
       }
     } catch (error) {
       console.error("Erro ao compartilhar:", error)
@@ -194,8 +193,12 @@ export function PostCard({ post }: PostCardProps) {
             <AvatarFallback className="bg-blue-600 text-white">{getInitials(post.author.name)}</AvatarFallback>
           </Avatar>
           <div>
-            <Link href={`/profile/${post.author._id}`} className="font-semibold hover:text-blue-600 transition-colors">
+            <Link
+              href={`/profile/${post.author._id}`}
+              className="font-semibold hover:text-blue-600 transition-colors flex items-center gap-1"
+            >
               {post.author.name}
+              {post.author.isVerified && <CheckCircle className="h-4 w-4 text-blue-500" />}
             </Link>
             <p className="text-sm text-muted-foreground">{formatDate(post.createdAt)}</p>
           </div>
@@ -219,7 +222,7 @@ export function PostCard({ post }: PostCardProps) {
             <DialogTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-blue-600">
                 <MessageCircle className="h-4 w-4" />
-                {comments.length > 0 ? `${comments.length} Comentário(s)` : "Comentar"}
+                {commentCount > 0 ? `${commentCount} Comentário${commentCount > 1 ? "s" : ""}` : "Comentar"}
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -233,7 +236,7 @@ export function PostCard({ post }: PostCardProps) {
                       <div className="flex items-start gap-2">
                         <Avatar className="h-6 w-6">
                           {c.author.avatar ? (
-                            <AvatarImage src={c.author.avatar} alt={c.author.name} />
+                            <AvatarImage src={c.author.avatar || "/placeholder.svg"} alt={c.author.name} />
                           ) : null}
                           <AvatarFallback>{c.author.name[0]}</AvatarFallback>
                         </Avatar>

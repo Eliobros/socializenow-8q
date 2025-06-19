@@ -1,3 +1,4 @@
+import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
@@ -38,9 +39,10 @@ export default function RootLayout({
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
-	<link rel="manifest" href="https://progressier.app/WqR446EWpW6NmDDNQwu9/progressier.json"/><script defer src="https://progressier.app/WqR446EWpW6NmDDNQwu9/script.js"></script> 
+        <link rel="manifest" href="https://progressier.app/WqR446EWpW6NmDDNQwu9/progressier.json" />
+        <script defer src="https://progressier.app/WqR446EWpW6NmDDNQwu9/script.js"></script>
       </head>
-      <body className={`${inter.className} pb-16 md:pb-0`}>
+      <body className={`${inter.className} pb-20 md:pb-0`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
         </ThemeProvider>

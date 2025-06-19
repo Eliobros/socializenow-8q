@@ -1,5 +1,3 @@
-// Arquivo: app/api/posts/[postId]/comments/route.ts
-
 import { type NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
@@ -21,11 +19,7 @@ function verifyToken(request: NextRequest) {
   }
 }
 
-// ✅ Função GET: Busca todos os comentários de um post
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ postId: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   try {
     const user = verifyToken(request)
     if (!user) {
@@ -41,9 +35,7 @@ export async function GET(
     const client = await clientPromise
     const db = client.db("socializenow")
     const commentsCollection = db.collection("comments")
-    const usersCollection = db.collection("users")
 
-    // Buscar os comentários + dados do autor
     const comments = await commentsCollection
       .aggregate([
         {
@@ -73,7 +65,7 @@ export async function GET(
         },
         {
           $sort: {
-            createdAt: 1, // Do mais antigo para o mais recente
+            createdAt: 1,
           },
         },
       ])
@@ -86,11 +78,7 @@ export async function GET(
   }
 }
 
-// ✅ Função POST: Cria novo comentário (já existe)
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ postId: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   try {
     const paramsData = await params
     const postId = paramsData.postId
@@ -135,18 +123,16 @@ export async function POST(
 
     const result = await comments.insertOne(comment)
 
+    // Incrementar contador de comentários no post
+    await posts.updateOne({ _id: new ObjectId(postId) }, { $inc: { commentsCount: 1 } })
+
     // Criar notificação para o autor do post (se não for o próprio usuário)
     if (post.authorId.toString() !== user.userId) {
       await notifications.insertOne({
         userId: post.authorId,
+        fromUserId: new ObjectId(user.userId),
         type: "comment",
         message: `${currentUser.name} comentou no seu post`,
-        from: {
-          _id: new ObjectId(user.userId),
-          name: currentUser.name,
-          username: currentUser.username || "",
-          avatar: currentUser.avatar || "",
-        },
         postId: new ObjectId(postId),
         read: false,
         createdAt: new Date(),
