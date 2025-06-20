@@ -1,37 +1,36 @@
-import { type NextRequest, NextResponse } from "next/server"
-import jwt from "jsonwebtoken"
-import { ObjectId } from "mongodb"
-import { writeFile, mkdir } from "fs/promises"
-import { join } from "path"
-import clientPromise from "@/lib/mongodb"
+import { type NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+import { ObjectId } from "mongodb";
+import clientPromise from "@/lib/mongodb";
+import cloudinary from '@/lib/cloudinary';
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization")
+  const authHeader = request.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null
+    return null;
   }
-  const token = authHeader.substring(7)
+  const token = authHeader.substring(7);
   try {
-    return jwt.verify(token, JWT_SECRET) as any
+    return jwt.verify(token, JWT_SECRET) as any;
   } catch {
-    return null
+    return null;
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const user = verifyToken(request)
+    const user = verifyToken(request);
     if (!user) {
-      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 });
     }
 
-    const client = await clientPromise
-    const db = client.db("socializenow")
-    const posts = db.collection("posts")
+    const client = await clientPromise;
+    const db = client.db("socializenow");
+    const posts = db.collection("posts");
 
-    const userId = new ObjectId(user.userId)
+    const userId = new ObjectId(user.userId);
 
     const postsList = await posts
       .aggregate([
@@ -95,78 +94,74 @@ export async function GET(request: NextRequest) {
           $sort: { createdAt: -1 },
         },
       ])
-      .toArray()
+      .toArray();
 
-    return NextResponse.json({ posts: postsList })
+    return NextResponse.json({ posts: postsList });
   } catch (error) {
-    console.error("Get posts error:", error)
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+    console.error("Get posts error:", error);
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const user = verifyToken(request)
+    const user = verifyToken(request);
     if (!user) {
-      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 });
     }
 
-    const contentType = request.headers.get("content-type")
-    let content = ""
-    let imagePath = ""
+    const contentType = request.headers.get("content-type");
+    let content = "";
+    let imagePath = "";
 
     if (contentType?.includes("multipart/form-data")) {
       // Post com imagem
-      const formData = await request.formData()
-      content = (formData.get("content") as string) || ""
-      const image = formData.get("image") as File
+      const formData = await request.formData();
+      content = (formData.get("content") as string) || "";
+      const image = formData.get("image") as File;
 
       if (!image && !content.trim()) {
-        return NextResponse.json({ error: "Conteúdo ou imagem é obrigatório" }, { status: 400 })
+        return NextResponse.json({ error: "Conteúdo ou imagem é obrigatório" }, { status: 400 });
       }
 
       if (image) {
-        // Validar arquivo
         if (!image.type.startsWith("image/")) {
-          return NextResponse.json({ error: "Apenas arquivos de imagem são permitidos" }, { status: 400 })
+          return NextResponse.json({ error: "Apenas arquivos de imagem são permitidos" }, { status: 400 });
         }
 
         if (image.size > 5 * 1024 * 1024) {
-          return NextResponse.json({ error: "A imagem deve ter no máximo 5MB" }, { status: 400 })
+          return NextResponse.json({ error: "A imagem deve ter no máximo 5MB" }, { status: 400 });
         }
 
-        // Salvar imagem
-        const timestamp = Date.now()
-        const extension = image.name.split(".").pop()
-        const filename = `${user.userId}_${timestamp}.${extension}`
+        // Converter a imagem para base64
+        const bytes = await image.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        const base64 = buffer.toString('base64');
+        const dataURI = `data:${image.type};base64,${base64}`;
 
-        const uploadDir = join(process.cwd(), "public", "post_photos")
-        try {
-          await mkdir(uploadDir, { recursive: true })
-        } catch (error) {
-          // Directory might already exist
-        }
+        // Upload para Cloudinary na pasta "posts"
+        const uploadResult = await cloudinary.uploader.upload(dataURI, {
+          folder: 'posts',
+          use_filename: true,
+          unique_filename: false,
+        });
 
-        const bytes = await image.arrayBuffer()
-        const buffer = Buffer.from(bytes)
-        const filepath = join(uploadDir, filename)
-        await writeFile(filepath, buffer)
-
-        imagePath = `/post_photos/${filename}`
+        imagePath = uploadResult.secure_url;
       }
     } else {
-      // Post apenas texto
-      const body = await request.json()
-      content = body.content
+      // Post só texto (JSON)
+      const body = await request.json();
+      content = body.content;
 
       if (!content || typeof content !== "string" || !content.trim()) {
-        return NextResponse.json({ error: "Conteúdo inválido" }, { status: 400 })
+        return NextResponse.json({ error: "Conteúdo inválido" }, { status: 400 });
       }
     }
 
-    const client = await clientPromise
-    const db = client.db("socializenow")
-    const posts = db.collection("posts")
+    // Conexão com MongoDB
+    const client = await clientPromise;
+    const db = client.db("socializenow");
+    const posts = db.collection("posts");
 
     const newPost: any = {
       authorId: new ObjectId(user.userId),
@@ -174,18 +169,17 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
       likes: 0,
       commentsCount: 0,
-    }
+    };
 
     if (imagePath) {
-      newPost.image = imagePath
+      newPost.image = imagePath;
     }
 
-    const result = await posts.insertOne(newPost)
+    const result = await posts.insertOne(newPost);
 
-    return NextResponse.json({ message: "Post criado com sucesso", postId: result.insertedId })
+    return NextResponse.json({ message: "Post criado com sucesso", postId: result.insertedId });
   } catch (error) {
-    console.error("Erro ao criar post:", error)
-    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
+    console.error("Erro ao criar post:", error);
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }
-
