@@ -260,7 +260,7 @@ export function PostCard({ post }: PostCardProps) {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">Nenhum comentário ainda.</p>
+                  <p className="text-sm text-muted-foreground">Nenhum comentário ainda seja o primeiro a comentar.</p>
                 )}
               </div>
               <div className="space-y-2">
@@ -282,7 +282,7 @@ export function PostCard({ post }: PostCardProps) {
             <DialogTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-green-600">
                 <Share className="h-4 w-4" />
-                Compartilhar
+                Partilhar
               </Button>
             </DialogTrigger>
             <DialogContent>
