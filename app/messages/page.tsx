@@ -332,7 +332,7 @@ export default function MessagesPage() {
       <div className="min-h-screen bg-white">
         {!selectedConversation ? (
           // Lista de Conversas - Mobile
-          <div className="h-screen flex flex-col">
+          <div className="h-screen flex flex-col overflow-hidden">
             {/* Header */}
             <div className="bg-white border-b border-gray-200 px-4 py-3">
               <div className="flex items-center justify-between">
@@ -503,7 +503,7 @@ export default function MessagesPage() {
           </div>
         ) : (
           // Chat Individual - Mobile
-          <div className="h-screen flex flex-col">
+          <div className="h-screen flex flex-col overflow-hidden">
             {/* Chat Header */}
             <div className="bg-white border-b border-gray-200 px-4 py-3">
               {(() => {
@@ -543,7 +543,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Messages */}
-            <ScrollArea className="flex-1 px-4 py-4">
+            <ScrollArea className="flex-1 px-4 py-2 min-h-0">
               <div className="space-y-4">
                 {messages.map((message, index) => {
                   const showTimestamp =
@@ -585,7 +585,7 @@ export default function MessagesPage() {
             </ScrollArea>
 
             {/* Message Input */}
-            <div className="bg-white border-t border-gray-200 px-4 py-3">
+            <div className="bg-white border-t border-gray-200 px-4 py-2 flex-shrink-0">
               <form onSubmit={sendMessage} className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Camera className="h-6 w-6 text-blue-500" />

@@ -184,7 +184,7 @@ export function PostCard({ post }: PostCardProps) {
   }
 
   return (
-    <Card>
+    <Card className="w-full overflow-hidden">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
@@ -206,14 +206,14 @@ export function PostCard({ post }: PostCardProps) {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        {post.content && <p className="mb-4 whitespace-pre-wrap">{post.content}</p>}
+        {post.content && <p className="mb-4 whitespace-pre-wrap break-words overflow-wrap-anywhere">{post.content}</p>}
 
         {post.image && (
           <div className="mb-4">
             <img
               src={post.image || "/placeholder.svg"}
               alt="Post image"
-              className="w-full max-h-96 object-cover rounded-lg"
+              className="w-full max-h-96 object-cover rounded-lg max-w-full"
             />
           </div>
         )}

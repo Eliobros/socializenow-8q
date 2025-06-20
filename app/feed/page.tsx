@@ -158,7 +158,7 @@ export default function FeedPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 overflow-x-hidden">
         <Navbar />
         <div className="flex items-center justify-center h-96">
           <Loader2 className="h-8 w-8 animate-spin" />
@@ -168,16 +168,16 @@ export default function FeedPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <Navbar />
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto px-4 py-8 max-w-2xl overflow-x-hidden">
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <Card className="mb-8">
+        <Card className="mb-8 w-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus className="h-5 w-5" />
@@ -195,11 +195,11 @@ export default function FeedPage() {
               />
 
               {imagePreview && (
-                <div className="relative">
+                <div className="relative w-full">
                   <img
                     src={imagePreview || "/placeholder.svg"}
                     alt="Preview"
-                    className="w-full max-h-64 object-cover rounded-lg"
+                    className="w-full max-h-64 object-cover rounded-lg max-w-full"
                   />
                   <Button
                     type="button"
