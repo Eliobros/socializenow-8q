@@ -28,14 +28,13 @@ async function uploadToCloudinary(file: File, filename: string) {
       {
         resource_type: "image",
         public_id: `documents/${filename}`,
-        folder: "socializenow/verify_docs", // opcional: organiza em pasta
+        folder: "socializenow/verify_docs",
       },
       (error, result) => {
         if (error) reject(error)
         else resolve(result)
       }
     )
-
     stream.end(buffer)
   })
 }
@@ -87,9 +86,22 @@ export async function POST(request: NextRequest) {
     const frontFilename = `${user.userId}_front_${timestamp}.${frontExt}`
     const backFilename = `${user.userId}_back_${timestamp}.${backExt}`
 
-    // Upload para Cloudinary
-    const frontResult: any = await uploadToCloudinary(documentFront, frontFilename)
-    const backResult: any = await uploadToCloudinary(documentBack, backFilename)
+    let frontResult: any
+    let backResult: any
+
+    try {
+      frontResult = await uploadToCloudinary(documentFront, frontFilename)
+    } catch (error) {
+      console.error("Erro no upload do documento frontal:", error)
+      return NextResponse.json({ error: "Erro ao enviar o lado frontal do documento" }, { status: 500 })
+    }
+
+    try {
+      backResult = await uploadToCloudinary(documentBack, backFilename)
+    } catch (error) {
+      console.error("Erro no upload do documento traseiro:", error)
+      return NextResponse.json({ error: "Erro ao enviar o lado traseiro do documento" }, { status: 500 })
+    }
 
     await verifyRequests.insertOne({
       userId: new ObjectId(user.userId),
