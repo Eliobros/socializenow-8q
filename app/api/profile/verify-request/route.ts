@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
+import { writeFile, mkdir } from "fs/promises"
+import { join } from "path"
 import clientPromise from "@/lib/mongodb"
-import cloudinary from "@/lib/cloudinary"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
@@ -18,25 +19,6 @@ function verifyToken(request: NextRequest) {
   } catch (error) {
     return null
   }
-}
-
-async function uploadToCloudinary(file: File, filename: string) {
-  const buffer = Buffer.from(await file.arrayBuffer())
-
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        resource_type: "image",
-        public_id: `documents/${filename}`,
-        folder: "socializenow/verify_docs",
-      },
-      (error, result) => {
-        if (error) reject(error)
-        else resolve(result)
-      }
-    )
-    stream.end(buffer)
-  })
 }
 
 export async function POST(request: NextRequest) {
@@ -57,6 +39,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Todos os campos são obrigatórios" }, { status: 400 })
     }
 
+    // Validar arquivos
     if (!documentFront.type.startsWith("image/") || !documentBack.type.startsWith("image/")) {
       return NextResponse.json({ error: "Apenas arquivos de imagem são permitidos" }, { status: 400 })
     }
@@ -70,6 +53,7 @@ export async function POST(request: NextRequest) {
     const verifyRequests = db.collection("verifyRequests")
     const notifications = db.collection("notifications")
 
+    // Verificar se já existe uma solicitação pendente
     const existingRequest = await verifyRequests.findOne({
       userId: new ObjectId(user.userId),
       status: "pending",
@@ -79,46 +63,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Você já possui uma solicitação pendente" }, { status: 400 })
     }
 
+    // Salvar arquivos
     const timestamp = Date.now()
-    const frontExt = documentFront.name.split(".").pop()
-    const backExt = documentBack.name.split(".").pop()
+    const frontExtension = documentFront.name.split(".").pop()
+    const backExtension = documentBack.name.split(".").pop()
+    const frontFilename = `${user.userId}_front_${timestamp}.${frontExtension}`
+    const backFilename = `${user.userId}_back_${timestamp}.${backExtension}`
 
-    const frontFilename = `${user.userId}_front_${timestamp}.${frontExt}`
-    const backFilename = `${user.userId}_back_${timestamp}.${backExt}`
-
-    let frontResult: any
-    let backResult: any
-
+    const uploadDir = join(process.cwd(), "public", "documents")
     try {
-      frontResult = await uploadToCloudinary(documentFront, frontFilename)
+      await mkdir(uploadDir, { recursive: true })
     } catch (error) {
-      console.error("Erro no upload do documento frontal:", error)
-      return NextResponse.json({ error: "Erro ao enviar o lado frontal do documento" }, { status: 500 })
+      // Directory might already exist
     }
 
-    try {
-      backResult = await uploadToCloudinary(documentBack, backFilename)
-    } catch (error) {
-      console.error("Erro no upload do documento traseiro:", error)
-      return NextResponse.json({ error: "Erro ao enviar o lado traseiro do documento" }, { status: 500 })
-    }
+    const frontBytes = await documentFront.arrayBuffer()
+    const backBytes = await documentBack.arrayBuffer()
+    const frontBuffer = Buffer.from(frontBytes)
+    const backBuffer = Buffer.from(backBytes)
 
+    await writeFile(join(uploadDir, frontFilename), frontBuffer)
+    await writeFile(join(uploadDir, backFilename), backBuffer)
+
+    // Criar solicitação
     await verifyRequests.insertOne({
       userId: new ObjectId(user.userId),
       fullName,
       birthDate: new Date(birthDate),
       reason,
-      documentFront: frontResult.secure_url,
-      documentBack: backResult.secure_url,
+      documentFront: `/documents/${frontFilename}`,
+      documentBack: `/documents/${backFilename}`,
       status: "pending",
       createdAt: new Date(),
     })
 
+    // Criar notificação para o usuário
     await notifications.insertOne({
       userId: new ObjectId(user.userId),
       type: "verification_request",
       message:
-        "O seu pedido de solicitação de selo foi enviado para a Equipe da SocializeNow. Você receberá uma notificação quando for aprovada ou se for recusada.",
+        "O seu pedido de solicitação de selo foi enviado para a Equipe da SocializeNow. Você receberá uma notificação quando for aprovada ou se precisarem de mais informações.",
       read: false,
       createdAt: new Date(),
     })

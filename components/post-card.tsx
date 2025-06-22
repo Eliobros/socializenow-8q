@@ -310,4 +310,3 @@ export function PostCard({ post }: PostCardProps) {
     </Card>
   )
 }
-

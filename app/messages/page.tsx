@@ -23,11 +23,13 @@ import {
   Mic,
   ImageIcon,
   Smile,
+  X,
 } from "lucide-react"
 
 interface Message {
   _id: string
   content: string
+  image?: string
   sender: {
     _id: string
     name: string
@@ -73,6 +75,8 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState("")
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState("")
@@ -83,6 +87,7 @@ export default function MessagesPage() {
   const [showNewChatDialog, setShowNewChatDialog] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -169,29 +174,86 @@ export default function MessagesPage() {
     }
   }
 
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith("image/")) {
+      setError("Por favor, selecione apenas arquivos de imagem")
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError("A imagem deve ter no máximo 10MB")
+      return
+    }
+
+    setSelectedImage(file)
+    setError("")
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const removeImage = () => {
+    setSelectedImage(null)
+    setImagePreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMessage.trim() || !selectedConversation) return
+    if ((!newMessage.trim() && !selectedImage) || !selectedConversation) return
 
     setSending(true)
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("/api/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          conversationId: selectedConversation,
-          content: newMessage,
-        }),
-      })
 
-      if (response.ok) {
-        setNewMessage("")
-        fetchMessages(selectedConversation)
-        fetchConversations()
+      if (selectedImage) {
+        // Mensagem com imagem
+        const formData = new FormData()
+        formData.append("conversationId", selectedConversation)
+        formData.append("content", newMessage)
+        formData.append("image", selectedImage)
+
+        const response = await fetch("/api/messages", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        })
+
+        if (response.ok) {
+          setNewMessage("")
+          removeImage()
+          fetchMessages(selectedConversation)
+          fetchConversations()
+        }
+      } else {
+        // Mensagem apenas texto
+        const response = await fetch("/api/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            conversationId: selectedConversation,
+            content: newMessage,
+          }),
+        })
+
+        if (response.ok) {
+          setNewMessage("")
+          fetchMessages(selectedConversation)
+          fetchConversations()
+        }
       }
     } catch (error) {
       console.error("Erro ao enviar mensagem")
@@ -399,40 +461,6 @@ export default function MessagesPage() {
               </div>
             </div>
 
-            {/* Stories Section */}
-            <div className="px-4 py-3">
-              <ScrollArea className="w-full">
-                <div className="flex gap-4">
-                  <div className="flex flex-col items-center gap-2 min-w-[70px]">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 p-0.5">
-                      <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
-                        <Plus className="h-6 w-6 text-gray-400" />
-                      </div>
-                    </div>
-                    <span className="text-xs text-gray-600">Sua nota</span>
-                  </div>
-                  {filteredConversations.slice(0, 5).map((conversation) => {
-                    const otherParticipant = getOtherParticipant(conversation)
-                    if (!otherParticipant) return null
-                    return (
-                      <div key={conversation._id} className="flex flex-col items-center gap-2 min-w-[70px]">
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 p-0.5">
-                          <Avatar className="w-full h-full">
-                            <AvatarFallback className="bg-blue-600 text-white">
-                              {getInitials(otherParticipant.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                        </div>
-                        <span className="text-xs text-gray-600 truncate w-16 text-center">
-                          {otherParticipant.name.split(" ")[0]}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </ScrollArea>
-            </div>
-
             {/* Messages Tab */}
             <div className="flex border-b border-gray-200">
               <div className="flex-1 text-center py-3">
@@ -574,7 +602,15 @@ export default function MessagesPage() {
                               : "bg-gray-200 text-gray-800 rounded-bl-md"
                           }`}
                         >
-                          <p className="text-sm">{message.content}</p>
+                          {message.image && (
+                            <img
+                              src={message.image || "/placeholder.svg"}
+                              alt="Imagem"
+                              className="w-full max-w-xs rounded-lg mb-2 cursor-pointer"
+                              onClick={() => window.open(message.image, "_blank")}
+                            />
+                          )}
+                          {message.content && <p className="text-sm">{message.content}</p>}
                         </div>
                       </div>
                     </div>
@@ -584,12 +620,44 @@ export default function MessagesPage() {
               </div>
             </ScrollArea>
 
+            {/* Image Preview */}
+            {imagePreview && (
+              <div className="px-4 py-2 bg-gray-50 border-t">
+                <div className="relative inline-block">
+                  <img src={imagePreview || "/placeholder.svg"} alt="Preview" className="max-h-20 rounded-lg" />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                    onClick={removeImage}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Message Input */}
             <div className="bg-white border-t border-gray-200 px-4 py-2 flex-shrink-0">
               <form onSubmit={sendMessage} className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <Camera className="h-6 w-6 text-blue-500" />
-                  <ImageIcon className="h-6 w-6 text-gray-400" />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="p-1"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Camera className="h-6 w-6 text-blue-500" />
+                  </Button>
                   <Mic className="h-6 w-6 text-gray-400" />
                 </div>
                 <div className="flex-1 relative">
@@ -604,7 +672,7 @@ export default function MessagesPage() {
                 </div>
                 <Button
                   type="submit"
-                  disabled={sending || !newMessage.trim()}
+                  disabled={sending || (!newMessage.trim() && !selectedImage)}
                   className="rounded-full w-10 h-10 p-0 bg-blue-500 hover:bg-blue-600"
                 >
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -778,7 +846,15 @@ export default function MessagesPage() {
                               : "bg-gray-200 text-gray-800"
                           }`}
                         >
-                          <p className="text-sm">{message.content}</p>
+                          {message.image && (
+                            <img
+                              src={message.image || "/placeholder.svg"}
+                              alt="Imagem"
+                              className="w-full rounded-lg mb-2 cursor-pointer"
+                              onClick={() => window.open(message.image, "_blank")}
+                            />
+                          )}
+                          {message.content && <p className="text-sm">{message.content}</p>}
                           <p
                             className={`text-xs mt-1 ${
                               message.sender._id === currentUserId ? "text-blue-100" : "text-gray-500"
@@ -793,8 +869,36 @@ export default function MessagesPage() {
                   </div>
                 </ScrollArea>
 
+                {/* Image Preview - Desktop */}
+                {imagePreview && (
+                  <div className="px-4 py-2 bg-gray-50 border-t">
+                    <div className="relative inline-block">
+                      <img src={imagePreview || "/placeholder.svg"} alt="Preview" className="max-h-32 rounded-lg" />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                        onClick={removeImage}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="border-t p-4 flex-shrink-0">
                   <form onSubmit={sendMessage} className="flex gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                      <ImageIcon className="h-4 w-4" />
+                    </Button>
                     <Input
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
@@ -802,7 +906,7 @@ export default function MessagesPage() {
                       className="flex-1"
                       disabled={sending}
                     />
-                    <Button type="submit" disabled={sending || !newMessage.trim()}>
+                    <Button type="submit" disabled={sending || (!newMessage.trim() && !selectedImage)}>
                       {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </Button>
                   </form>
@@ -822,4 +926,3 @@ export default function MessagesPage() {
     </div>
   )
 }
-

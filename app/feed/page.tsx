@@ -6,6 +6,8 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { PostCard } from "@/components/post-card"
+import { StoriesSection } from "@/components/stories-section"
+import { CreateStoryDialog } from "@/components/create-story-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -32,6 +34,7 @@ export default function FeedPage() {
   const [loading, setLoading] = useState(true)
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState("")
+  const [showCreateStory, setShowCreateStory] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
@@ -170,12 +173,30 @@ export default function FeedPage() {
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <Navbar />
+
+      {/* Stories Section - Mobile */}
+      <div className="md:hidden bg-white border-b border-gray-200">
+        <StoriesSection onCreateStory={() => setShowCreateStory(true)} />
+      </div>
+
       <div className="container mx-auto px-4 py-8 max-w-2xl overflow-x-hidden">
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+
+        {/* Stories Section - Desktop */}
+        <div className="hidden md:block mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Stories</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <StoriesSection onCreateStory={() => setShowCreateStory(true)} />
+            </CardContent>
+          </Card>
+        </div>
 
         <Card className="mb-8 w-full">
           <CardHeader>
@@ -249,7 +270,14 @@ export default function FeedPage() {
           )}
         </div>
       </div>
+
+      <CreateStoryDialog
+        open={showCreateStory}
+        onOpenChange={setShowCreateStory}
+        onStoryCreated={() => {
+          // Refresh stories if needed
+        }}
+      />
     </div>
   )
 }
-
