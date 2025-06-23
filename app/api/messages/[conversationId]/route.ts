@@ -19,7 +19,10 @@ function verifyToken(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { conversationId: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { conversationId: string } }
+) {
   try {
     const user = verifyToken(request)
     if (!user) {
@@ -27,16 +30,20 @@ export async function GET(request: NextRequest, { params }: { params: { conversa
     }
 
     const { conversationId } = params
+    if (!conversationId) {
+      return NextResponse.json({ error: "ID da conversa é obrigatório" }, { status: 400 })
+    }
 
     const client = await clientPromise
     const db = client.db("socializenow")
     const messages = db.collection("messages")
 
-    // Get messages with sender and receiver information
     const conversationMessages = await messages
       .aggregate([
         {
-          $match: { conversationId: new ObjectId(conversationId) },
+          $match: {
+            conversationId: new ObjectId(conversationId),
+          },
         },
         {
           $lookup: {
@@ -54,15 +61,12 @@ export async function GET(request: NextRequest, { params }: { params: { conversa
             as: "receiver",
           },
         },
-        {
-          $unwind: "$sender",
-        },
-        {
-          $unwind: "$receiver",
-        },
+        { $unwind: "$sender" },
+        { $unwind: "$receiver" },
         {
           $project: {
             content: 1,
+            image: 1,
             read: 1,
             createdAt: 1,
             "sender._id": 1,
@@ -81,7 +85,8 @@ export async function GET(request: NextRequest, { params }: { params: { conversa
 
     return NextResponse.json({ messages: conversationMessages })
   } catch (error) {
-    console.error("Get messages error:", error)
+    console.error("Erro ao buscar mensagens:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
+

@@ -33,7 +33,6 @@ export async function POST(request: NextRequest) {
     let imageUrl: string | null = null
 
     if (contentType?.includes("multipart/form-data")) {
-      // Mensagem com imagem
       const formData = await request.formData()
       conversationId = formData.get("conversationId") as string
       content = (formData.get("content") as string) || ""
@@ -47,7 +46,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Conteúdo ou imagem são obrigatórios" }, { status: 400 })
       }
 
-      // Upload da imagem para o Cloudinary
       if (image) {
         try {
           const bytes = await image.arrayBuffer()
@@ -59,7 +57,11 @@ export async function POST(request: NextRequest) {
                 {
                   resource_type: "image",
                   folder: "message_images",
-                  transformation: [{ width: 800, height: 600, crop: "limit" }, { quality: "auto" }, { format: "auto" }],
+                  transformation: [
+                    { width: 800, height: 600, crop: "limit" },
+                    { quality: "auto" },
+                    { format: "auto" }
+                  ],
                 },
                 (error, result) => {
                   if (error) reject(error)
@@ -76,7 +78,6 @@ export async function POST(request: NextRequest) {
         }
       }
     } else {
-      // Mensagem apenas texto
       const body = await request.json()
       conversationId = body.conversationId
       content = body.content
@@ -91,16 +92,13 @@ export async function POST(request: NextRequest) {
     const messages = db.collection("messages")
     const conversations = db.collection("conversations")
 
-    // Get conversation to find receiver
     const conversation = await conversations.findOne({ _id: new ObjectId(conversationId) })
     if (!conversation) {
       return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 })
     }
 
-    // Find receiver (the other participant)
     const receiverId = conversation.participants.find((p: ObjectId) => !p.equals(new ObjectId(user.userId)))
 
-    // Create message
     const messageData: any = {
       conversationId: new ObjectId(conversationId),
       sender: new ObjectId(user.userId),
@@ -116,7 +114,6 @@ export async function POST(request: NextRequest) {
 
     const result = await messages.insertOne(messageData)
 
-    // Update conversation's last message
     const lastMessageContent = imageUrl ? content.trim() || "📷 Imagem" : content.trim()
     await conversations.updateOne(
       { _id: new ObjectId(conversationId) },
@@ -129,12 +126,16 @@ export async function POST(request: NextRequest) {
           },
           updatedAt: new Date(),
         },
-      },
+      }
     )
 
     return NextResponse.json({
       message: "Mensagem enviada com sucesso",
       messageId: result.insertedId,
+      data: {
+        ...messageData,
+        _id: result.insertedId,
+      }
     })
   } catch (error) {
     console.error("Send message error:", error)
