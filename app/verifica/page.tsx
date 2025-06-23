@@ -14,26 +14,28 @@ export default function Verifica() {
   const params = useSearchParams()
   const router = useRouter()
 
+  // Pegando os parâmetros dentro do corpo do componente (sem erro)
+  const numero = params.get("numero")
+  const nome = params.get("nome")
+  const email = params.get("email")
+  const valor = params.get("valor")
+  const meio_de_pagamento = params.get("meio_de_pagamento")
+
+  const goTo = (path: string) => router.push(path)
+
   useEffect(() => {
-    const salvarPagamento = async () => {
-      const numero = params.get("numero")
-      const nome = params.get("nome")
-      const email = params.get("email")
-      const valor = params.get("valor")
-      const meio_de_pagamento = params.get("meio_de_pagamento")
+    // Se faltar algum parâmetro essencial, já seta erro e para
+    if (!numero || !nome || !valor) {
+      setError("Dados de pagamento incompletos")
+      setLoading(false)
+      return
+    }
 
-      if (!numero || !nome || !valor) {
-        setError("Dados de pagamento incompletos")
-        setLoading(false)
-        return
-      }
-
+    async function salvarPagamento() {
       try {
-        const response = await fetch("/api/pagamento", {
+        const res = await fetch("/api/pagamento", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             numero,
             nome,
@@ -44,16 +46,14 @@ export default function Verifica() {
           }),
         })
 
-        const data = await response.json()
+        const data = await res.json()
 
         if (data.success) {
           setSuccess(true)
-          console.log("Pagamento salvo com sucesso!")
         } else {
           setError("Erro ao processar pagamento")
         }
       } catch (err) {
-        console.error("Erro ao salvar pagamento:", err)
         setError("Erro de conexão")
       } finally {
         setLoading(false)
@@ -61,7 +61,14 @@ export default function Verifica() {
     }
 
     salvarPagamento()
-  }, [params])
+  }, [numero, nome, email, valor, meio_de_pagamento])
+
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => goTo("/notifications"), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [success])
 
   if (loading) {
     return (
@@ -100,8 +107,7 @@ export default function Verifica() {
                   <Shield className="h-8 w-8 text-green-600 mx-auto mb-3" />
                   <h3 className="text-lg font-semibold text-green-800 mb-2">Solicitação de Selo Enviada!</h3>
                   <p className="text-green-700">
-                    Obrigado por apoiar a SocializeNow! Sua solicitação de selo de verificação foi enviada para nossa
-                    equipe de análise.
+                    Obrigado por apoiar a SocializeNow! Sua solicitação de selo de verificação foi enviada para nossa equipe.
                   </p>
                 </div>
 
@@ -117,10 +123,10 @@ export default function Verifica() {
               </div>
 
               <div className="flex gap-4">
-                <Button onClick={() => router.push("/notifications")} variant="outline" className="flex-1">
+                <Button onClick={() => goTo("/notifications")} variant="outline" className="flex-1">
                   Ver Notificações
                 </Button>
-                <Button onClick={() => router.push("/")} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                <Button onClick={() => goTo("/")} className="flex-1 bg-blue-600 hover:bg-blue-700">
                   <Home className="h-4 w-4 mr-2" />
                   Ir para o Feed
                 </Button>
@@ -146,10 +152,10 @@ export default function Verifica() {
               </div>
 
               <div className="flex gap-4">
-                <Button onClick={() => router.push("/settings")} variant="outline" className="flex-1">
+                <Button onClick={() => goTo("/settings")} variant="outline" className="flex-1">
                   Tentar Novamente
                 </Button>
-                <Button onClick={() => router.push("/")} className="flex-1">
+                <Button onClick={() => goTo("/")} className="flex-1">
                   <Home className="h-4 w-4 mr-2" />
                   Voltar ao Feed
                 </Button>
