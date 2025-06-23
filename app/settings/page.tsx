@@ -104,15 +104,8 @@ export default function SettingsPage() {
       const data = await response.json()
 
       if (response.ok) {
-        setSuccess("Solicitação de verificação enviada com sucesso!")
-        setShowVerifyDialog(false)
-        setVerifyForm({
-          fullName: user?.name || "",
-          birthDate: "",
-          reason: "",
-          documentFront: null,
-          documentBack: null,
-        })
+        // Redirecionar para pagamento em vez de mostrar sucesso
+        router.push("/pagamento-selo")
       } else {
         setError(data.error || "Erro ao enviar solicitação")
       }
@@ -329,7 +322,7 @@ export default function SettingsPage() {
 
                           <Button type="submit" disabled={submitting} className="w-full">
                             {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                            Enviar Solicitação
+                            Prosseguir para Pagamento
                           </Button>
                         </form>
                       </DialogContent>
