@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/navbar"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -15,6 +15,7 @@ import {
   MessageCircle,
   Plus,
   ArrowLeft,
+  ArrowDown,
   Search,
   Phone,
   Video,
@@ -25,6 +26,7 @@ import {
   Smile,
   X,
 } from "lucide-react"
+import { CallManager } from "@/components/call/call-manager"
 
 interface Message {
   _id: string
@@ -90,6 +92,13 @@ export default function MessagesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [user, setUser] = useState<User | null>(null)
+  const [isUserScrolling, setIsUserScrolling] = useState(false)
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
+
+  const [showCallConfirm, setShowCallConfirm] = useState(false)
+  const [pendingCallType, setPendingCallType] = useState<"audio" | "video" | null>(null)
+  const [pendingCallUser, setPendingCallUser] = useState<{ id: string; name: string } | null>(null)
 
   useEffect(() => {
     const token = localStorage.getItem("token")
@@ -127,11 +136,29 @@ export default function MessagesPage() {
   }, [router, selectedConversation, searchParams])
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    if (shouldAutoScroll && !isUserScrolling && messages.length > 0) {
+      const timer = setTimeout(() => {
+        scrollToBottom()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [messages, shouldAutoScroll, isUserScrolling])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 50
+
+    if (!isAtBottom && shouldAutoScroll) {
+      setIsUserScrolling(true)
+      setShouldAutoScroll(false)
+    } else if (isAtBottom && !shouldAutoScroll) {
+      setIsUserScrolling(false)
+      setShouldAutoScroll(true)
+    }
   }
 
   const fetchConversations = async () => {
@@ -370,6 +397,32 @@ export default function MessagesPage() {
     return otherParticipant?.name.toLowerCase().includes(searchTerm.toLowerCase())
   })
 
+  const startCall = (callType: "audio" | "video") => {
+    const conversation = conversations.find((c) => c._id === selectedConversation)
+    const otherParticipant = conversation ? getOtherParticipant(conversation) : null
+
+    if (otherParticipant) {
+      setPendingCallType(callType)
+      setPendingCallUser({ id: otherParticipant._id, name: otherParticipant.name })
+      setShowCallConfirm(true)
+    }
+  }
+
+  const confirmCall = () => {
+    if (pendingCallUser && pendingCallType && typeof window !== "undefined" && (window as any).startCall) {
+      ;(window as any).startCall(pendingCallUser.id, pendingCallUser.name, pendingCallType)
+    }
+    setShowCallConfirm(false)
+    setPendingCallType(null)
+    setPendingCallUser(null)
+  }
+
+  const cancelCall = () => {
+    setShowCallConfirm(false)
+    setPendingCallType(null)
+    setPendingCallUser(null)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white">
@@ -430,6 +483,7 @@ export default function MessagesPage() {
                               onClick={() => startNewConversation(user._id)}
                             >
                               <Avatar className="h-12 w-12">
+                                {user.avatar && <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />}
                                 <AvatarFallback className="bg-blue-600 text-white">
                                   {getInitials(user.name)}
                                 </AvatarFallback>
@@ -496,12 +550,18 @@ export default function MessagesPage() {
                         <div className="flex items-center gap-3">
                           <div className="relative">
                             <Avatar className="h-14 w-14">
+                              {otherParticipant.avatar && (
+                                <AvatarImage
+                                  src={otherParticipant.avatar || "/placeholder.svg"}
+                                  alt={otherParticipant.name}
+                                />
+                              )}
                               <AvatarFallback className="bg-blue-600 text-white">
                                 {getInitials(otherParticipant.name)}
                               </AvatarFallback>
                             </Avatar>
                             {otherParticipant.isOnline && (
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+                              <div className="absolute -bottom-0 -right-0 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -531,9 +591,9 @@ export default function MessagesPage() {
           </div>
         ) : (
           // Chat Individual - Mobile
-          <div className="h-screen flex flex-col overflow-hidden">
-            {/* Chat Header */}
-            <div className="bg-white border-b border-gray-200 px-4 py-3">
+          <div className="fixed inset-0 bg-white flex flex-col">
+            {/* Chat Header - Fixed */}
+            <div className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0 z-10">
               {(() => {
                 const conversation = conversations.find((c) => c._id === selectedConversation)
                 const otherParticipant = conversation ? getOtherParticipant(conversation) : null
@@ -543,12 +603,18 @@ export default function MessagesPage() {
                       <ArrowLeft className="h-6 w-6 cursor-pointer" onClick={() => setSelectedConversation(null)} />
                       <div className="relative">
                         <Avatar className="h-10 w-10">
+                          {otherParticipant?.avatar && (
+                            <AvatarImage
+                              src={otherParticipant.avatar || "/placeholder.svg"}
+                              alt={otherParticipant.name}
+                            />
+                          )}
                           <AvatarFallback className="bg-blue-600 text-white">
                             {otherParticipant ? getInitials(otherParticipant.name) : "U"}
                           </AvatarFallback>
                         </Avatar>
                         {otherParticipant?.isOnline && (
-                          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                          <div className="absolute -bottom-0 -right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                         )}
                       </div>
                       <div>
@@ -561,8 +627,8 @@ export default function MessagesPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                      <Phone className="h-6 w-6 text-gray-600" />
-                      <Video className="h-6 w-6 text-gray-600" />
+                      <Phone className="h-6 w-6 text-gray-600 cursor-pointer" onClick={() => startCall("audio")} />
+                      <Video className="h-6 w-6 text-gray-600 cursor-pointer" onClick={() => startCall("video")} />
                       <Info className="h-6 w-6 text-gray-600" />
                     </div>
                   </div>
@@ -570,59 +636,93 @@ export default function MessagesPage() {
               })()}
             </div>
 
-            {/* Messages */}
-            <ScrollArea className="flex-1 px-4 py-2 min-h-0">
-              <div className="space-y-4">
-                {messages.map((message, index) => {
-                  const showTimestamp =
-                    index === 0 ||
-                    new Date(messages[index - 1].createdAt).getDate() !== new Date(message.createdAt).getDate()
+            {/* Messages Container - Scrollable */}
+            <div className="flex-1 overflow-hidden relative">
+              <div
+                className="h-full overflow-y-auto px-4 py-2"
+                onScroll={handleScroll}
+                style={{ scrollBehavior: isUserScrolling ? "auto" : "smooth" }}
+              >
+                <div className="space-y-4 min-h-full flex flex-col justify-end">
+                  {messages.map((message, index) => {
+                    const showTimestamp =
+                      index === 0 ||
+                      new Date(messages[index - 1].createdAt).getDate() !== new Date(message.createdAt).getDate()
 
-                  return (
-                    <div key={message._id}>
-                      {showTimestamp && (
-                        <div className="text-center my-4">
-                          <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                            {formatMessageTime(message.createdAt)}
-                          </span>
-                        </div>
-                      )}
-                      <div className={`flex ${message.sender._id === currentUserId ? "justify-end" : "justify-start"}`}>
-                        {message.sender._id !== currentUserId && (
-                          <Avatar className="h-8 w-8 mr-2 mt-1">
-                            <AvatarFallback className="bg-blue-600 text-white text-xs">
-                              {getInitials(message.sender.name)}
-                            </AvatarFallback>
-                          </Avatar>
+                    const conversation = conversations.find((c) => c._id === selectedConversation)
+                    const otherParticipant = conversation ? getOtherParticipant(conversation) : null
+
+                    return (
+                      <div key={message._id}>
+                        {showTimestamp && (
+                          <div className="text-center my-4">
+                            <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                              {formatMessageTime(message.createdAt)}
+                            </span>
+                          </div>
                         )}
                         <div
-                          className={`max-w-[75%] px-4 py-2 rounded-2xl ${
-                            message.sender._id === currentUserId
-                              ? "bg-blue-500 text-white rounded-br-md"
-                              : "bg-gray-200 text-gray-800 rounded-bl-md"
-                          }`}
+                          className={`flex ${message.sender._id === currentUserId ? "justify-end" : "justify-start"}`}
                         >
-                          {message.image && (
-                            <img
-                              src={message.image || "/placeholder.svg"}
-                              alt="Imagem"
-                              className="w-full max-w-xs rounded-lg mb-2 cursor-pointer"
-                              onClick={() => window.open(message.image, "_blank")}
-                            />
+                          {message.sender._id !== currentUserId && (
+                            <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
+                              {message.sender.avatar && (
+                                <AvatarImage
+                                  src={message.sender.avatar || "/placeholder.svg"}
+                                  alt={message.sender.name}
+                                />
+                              )}
+                              <AvatarFallback className="bg-blue-600 text-white text-xs">
+                                {getInitials(message.sender.name)}
+                              </AvatarFallback>
+                            </Avatar>
                           )}
-                          {message.content && <p className="text-sm">{message.content}</p>}
+                          <div
+                            className={`max-w-[75%] px-4 py-2 rounded-2xl ${
+                              message.sender._id === currentUserId
+                                ? "bg-blue-500 text-white rounded-br-md"
+                                : "bg-gray-200 text-gray-800 rounded-bl-md"
+                            }`}
+                          >
+                            {message.image && (
+                              <img
+                                src={message.image || "/placeholder.svg"}
+                                alt="Imagem"
+                                className="w-full max-w-xs rounded-lg mb-2 cursor-pointer"
+                                onClick={() => window.open(message.image, "_blank")}
+                              />
+                            )}
+                            {message.content && <p className="text-sm break-words">{message.content}</p>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
-                <div ref={messagesEndRef} />
+                    )
+                  })}
+                  <div ref={messagesEndRef} className="h-1 flex-shrink-0" />
+                </div>
               </div>
-            </ScrollArea>
 
-            {/* Image Preview */}
+              {/* Scroll to bottom button */}
+              {!shouldAutoScroll && (
+                <div className="absolute bottom-4 right-4 z-20">
+                  <Button
+                    size="sm"
+                    className="rounded-full h-10 w-10 p-0 bg-blue-500 hover:bg-blue-600 shadow-lg"
+                    onClick={() => {
+                      setShouldAutoScroll(true)
+                      setIsUserScrolling(false)
+                      scrollToBottom()
+                    }}
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Image Preview - Fixed */}
             {imagePreview && (
-              <div className="px-4 py-2 bg-gray-50 border-t">
+              <div className="px-4 py-2 bg-gray-50 border-t flex-shrink-0">
                 <div className="relative inline-block">
                   <img src={imagePreview || "/placeholder.svg"} alt="Preview" className="max-h-20 rounded-lg" />
                   <Button
@@ -638,7 +738,7 @@ export default function MessagesPage() {
               </div>
             )}
 
-            {/* Message Input */}
+            {/* Message Input - Fixed */}
             <div className="bg-white border-t border-gray-200 px-4 py-2 flex-shrink-0">
               <form onSubmit={sendMessage} className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -725,7 +825,8 @@ export default function MessagesPage() {
                             className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
                             onClick={() => startNewConversation(user._id)}
                           >
-                            <Avatar className="h-10 w-10">
+                            <Avatar className="h-12 w-12">
+                              {user.avatar && <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />}
                               <AvatarFallback className="bg-blue-600 text-white">
                                 {getInitials(user.name)}
                               </AvatarFallback>
@@ -768,6 +869,12 @@ export default function MessagesPage() {
                       <div className="flex items-center gap-3">
                         <div className="relative">
                           <Avatar className="h-12 w-12">
+                            {otherParticipant?.avatar ? (
+                              <AvatarImage
+                                src={otherParticipant?.avatar || "/placeholder.svg"}
+                                alt={otherParticipant?.name || ""}
+                              />
+                            ) : null}
                             <AvatarFallback className="bg-blue-600 text-white">
                               {getInitials(otherParticipant.name)}
                             </AvatarFallback>
@@ -798,8 +905,6 @@ export default function MessagesPage() {
               )}
             </ScrollArea>
           </div>
-
-          {/* Área de Mensagens - Desktop */}
           <div className="lg:col-span-2 h-[calc(100vh-200px)] bg-white rounded-lg shadow-sm border flex flex-col">
             {selectedConversation ? (
               <>
@@ -813,6 +918,12 @@ export default function MessagesPage() {
                           <>
                             <div className="relative">
                               <Avatar className="h-10 w-10">
+                                {otherParticipant?.avatar ? (
+                                  <AvatarImage
+                                    src={otherParticipant?.avatar || "/placeholder.svg"}
+                                    alt={otherParticipant?.name || ""}
+                                  />
+                                ) : null}
                                 <AvatarFallback className="bg-blue-600 text-white">
                                   {getInitials(otherParticipant.name)}
                                 </AvatarFallback>
@@ -923,6 +1034,54 @@ export default function MessagesPage() {
           </div>
         </div>
       </div>
+      {/* Call Manager */}
+      {currentUserId && <CallManager currentUserId={currentUserId} currentUserName={user?.name || "Usuário"} />}
+
+      {/* Call Confirmation Dialog */}
+      <Dialog open={showCallConfirm} onOpenChange={setShowCallConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {pendingCallType === "video" ? "Iniciar chamada de vídeo?" : "Iniciar chamada de voz?"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                {pendingCallType === "video" ? (
+                  <Video className="h-8 w-8 text-blue-500" />
+                ) : (
+                  <Phone className="h-8 w-8 text-green-500" />
+                )}
+                <div>
+                  <p className="font-medium">{pendingCallUser?.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {pendingCallType === "video" ? "Chamada de vídeo" : "Chamada de voz"}
+                  </p>
+                </div>
+              </div>
+              <p className="text-gray-600">
+                Deseja realmente iniciar uma {pendingCallType === "video" ? "chamada de vídeo" : "chamada de voz"} com{" "}
+                {pendingCallUser?.name}?
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={cancelCall}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={confirmCall}
+                className={
+                  pendingCallType === "video" ? "bg-blue-500 hover:bg-blue-600" : "bg-green-500 hover:bg-green-600"
+                }
+              >
+                {pendingCallType === "video" ? "Iniciar Chamada de Vídeo" : "Iniciar Chamada de Voz"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
+

@@ -180,10 +180,10 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-2xl">
         <Card className="mb-6">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <CardTitle className="flex items-center gap-2">
                 <Bell className="h-6 w-6" />
                 Notificações
@@ -194,9 +194,15 @@ export default function NotificationsPage() {
                 )}
               </CardTitle>
               {unreadCount > 0 && (
-                <Button variant="outline" size="sm" onClick={markAllAsRead}>
-                  <Check className="h-4 w-4 mr-2" />
-                  Marcar todas como lidas
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={markAllAsRead}
+                  className="w-full sm:w-auto text-xs sm:text-sm"
+                >
+                  <Check className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden xs:inline">Marcar todas como lidas</span>
+                  <span className="xs:hidden">Marcar como lidas</span>
                 </Button>
               )}
             </div>
@@ -226,9 +232,9 @@ export default function NotificationsPage() {
                 }`}
                 onClick={() => handleNotificationClick(notification)}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <Avatar className="h-10 w-10">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
                       {notification.from.avatar ? (
                         <AvatarImage
                           src={notification.from.avatar || "/placeholder.svg"}
@@ -241,13 +247,13 @@ export default function NotificationsPage() {
                     </Avatar>
 
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-1 sm:gap-2 mb-1 flex-wrap">
                         {getNotificationIcon(notification.type)}
-                        <span className="font-medium">{notification.from.name}</span>
+                        <span className="font-medium text-sm sm:text-base break-words">{notification.from.name}</span>
                         {!notification.read && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
                       </div>
-                      <p className="text-sm mb-2">{notification.message}</p>
-                      <p className="text-muted-foreground text-xs">{formatDate(notification.createdAt)}</p>
+                      <p className="text-xs sm:text-sm mb-2 break-words leading-relaxed">{notification.message}</p>
+                      <p className="text-muted-foreground text-xs leading-none">{formatDate(notification.createdAt)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -259,3 +265,4 @@ export default function NotificationsPage() {
     </div>
   )
 }
+
