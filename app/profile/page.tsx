@@ -35,6 +35,7 @@ interface Post {
   author: {
     name: string
     email: string
+    avatar?: string // Adicionado avatar no author
   }
   createdAt: string
   likes: number
@@ -119,6 +120,39 @@ export default function ProfilePage() {
     }
   }
 
+  // Função para criar post automático quando trocar foto
+  const createProfileUpdatePost = async (avatarUrl: string) => {
+    try {
+      const token = localStorage.getItem("token")
+
+      // Criar FormData para enviar como multipart (mesmo formato da sua API)
+      const formData = new FormData()
+      formData.append("content", "Atualizou a foto de perfil")
+
+      // Baixar a imagem do avatar e enviar como arquivo
+      const response = await fetch(avatarUrl)
+      const blob = await response.blob()
+      const file = new File([blob], "profile-update.jpg", { type: blob.type })
+      formData.append("image", file)
+
+      const postResponse = await fetch("/api/posts", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      })
+
+      if (postResponse.ok) {
+        console.log("Post de atualização de perfil criado com sucesso!")
+        // Recarregar posts para mostrar o novo post
+        fetchUserPosts()
+      }
+    } catch (error) {
+      console.error("Erro ao criar post de atualização de perfil:", error)
+    }
+  }
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -155,7 +189,22 @@ export default function ProfilePage() {
 
       if (response.ok) {
         setSuccess("Foto de perfil atualizada com sucesso!")
-        fetchProfile()
+
+        // Atualizar o avatar no estado local imediatamente
+        if (profile) {
+          setProfile({
+            ...profile,
+            avatar: data.avatarUrl,
+          })
+        }
+
+        // Criar post automático de atualização de perfil
+        await createProfileUpdatePost(data.avatarUrl)
+
+        // Recarregar perfil para garantir sincronização
+        setTimeout(() => {
+          fetchProfile()
+        }, 1000)
       } else {
         setError(data.error || "Erro ao fazer upload da imagem")
       }
@@ -187,7 +236,21 @@ export default function ProfilePage() {
 
       if (response.ok) {
         setSuccess("Perfil atualizado com sucesso!")
-        fetchProfile()
+
+        // Atualizar apenas os campos editados, mantendo o avatar
+        if (profile) {
+          setProfile({
+            ...profile,
+            name: profileForm.name,
+            username: profileForm.username,
+            bio: profileForm.bio,
+            // Manter o avatar atual
+            avatar: profile.avatar,
+          })
+        }
+
+        // Recarregar posts para atualizar o nome nos posts existentes
+        fetchUserPosts()
       } else {
         setError(data.error || "Erro ao atualizar perfil")
       }
@@ -292,7 +355,7 @@ export default function ProfilePage() {
             <div className="flex flex-col md:flex-row items-center gap-6">
               <div className="relative">
                 <Avatar className="h-32 w-32">
-                  <AvatarImage src={profile.avatar || "/placeholder.svg"} />
+                  <AvatarImage src={profile.avatar || "/placeholder.svg"} alt={`Foto de perfil de ${profile.name}`} />
                   <AvatarFallback className="bg-blue-600 text-white text-2xl">
                     {getInitials(profile.name)}
                   </AvatarFallback>
@@ -361,7 +424,18 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
             ) : (
-              posts.map((post) => <PostCard key={post._id} post={post} />)
+              posts.map((post) => (
+                <PostCard
+                  key={post._id}
+                  post={{
+                    ...post,
+                    author: {
+                      ...post.author,
+                      avatar: profile.avatar, // Garantir que o avatar atual seja usado
+                    },
+                  }}
+                />
+              ))
             )}
           </TabsContent>
 
@@ -496,3 +570,4 @@ export default function ProfilePage() {
     </div>
   )
 }
+

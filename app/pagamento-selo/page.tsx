@@ -67,7 +67,7 @@ const pagar = async () => {
         carteira: process.env.NEXT_PUBLIC_CARTEIRA_ID,
         numero,
         nome,
-        valor: "10",
+        valor: "50",
         meio_de_pagamento: metodoPagamento,
         email,
         return_url: `${window.location.origin}/verifica`,
