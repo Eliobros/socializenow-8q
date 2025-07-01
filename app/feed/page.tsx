@@ -1,9 +1,7 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { PostCard } from "@/components/post-card"
 import { StoriesSection } from "@/components/stories-section"
@@ -13,20 +11,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Plus, ImageIcon, X } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
 
 interface Post {
   _id: string
   content: string
   image?: string
-  author: {
-    name: string
-    email: string
-  }
   createdAt: string
   likes: number
+  likedByUser: boolean
+  commentsCount: number
+  author: {
+    _id: string
+    name: string
+    email: string
+    avatar?: string
+    isVerified?: boolean
+  }
 }
 
 export default function FeedPage() {
+  const { user, loading: authLoading, isAuthenticated } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
   const [newPost, setNewPost] = useState("")
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
@@ -36,24 +41,17 @@ export default function FeedPage() {
   const [error, setError] = useState("")
   const [showCreateStory, setShowCreateStory] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      router.push("/login")
-      return
+    if (!authLoading && isAuthenticated) {
+      fetchPosts()
     }
-    fetchPosts()
-  }, [router])
+  }, [authLoading, isAuthenticated])
 
   const fetchPosts = async () => {
     try {
-      const token = localStorage.getItem("token")
       const response = await fetch("/api/posts", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: "include",
       })
 
       if (response.ok) {
@@ -73,21 +71,17 @@ export default function FeedPage() {
     const file = event.target.files?.[0]
     if (!file) return
 
-    // Validar tipo de arquivo
     if (!file.type.startsWith("image/")) {
       setError("Por favor, selecione apenas arquivos de imagem")
       return
     }
 
-    // Validar tamanho (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       setError("A imagem deve ter no máximo 5MB")
       return
     }
 
     setSelectedImage(file)
-
-    // Criar preview
     const reader = new FileReader()
     reader.onload = (e) => {
       setImagePreview(e.target?.result as string)
@@ -111,19 +105,14 @@ export default function FeedPage() {
     setError("")
 
     try {
-      const token = localStorage.getItem("token")
-
       if (selectedImage) {
-        // Post com imagem
         const formData = new FormData()
         formData.append("content", newPost)
         formData.append("image", selectedImage)
 
         const response = await fetch("/api/posts", {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          credentials: "include",
           body: formData,
         })
 
@@ -135,13 +124,12 @@ export default function FeedPage() {
           setError("Erro ao criar post")
         }
       } else {
-        // Post apenas texto
         const response = await fetch("/api/posts", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
+          credentials: "include",
           body: JSON.stringify({ content: newPost }),
         })
 
@@ -159,7 +147,7 @@ export default function FeedPage() {
     }
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 overflow-x-hidden">
         <Navbar />
@@ -170,11 +158,14 @@ export default function FeedPage() {
     )
   }
 
+  if (!isAuthenticated) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <Navbar />
 
-      {/* Stories Section - Mobile */}
       <div className="md:hidden bg-white border-b border-gray-200">
         <StoriesSection onCreateStory={() => setShowCreateStory(true)} />
       </div>
@@ -186,7 +177,6 @@ export default function FeedPage() {
           </Alert>
         )}
 
-        {/* Stories Section - Desktop */}
         <div className="hidden md:block mb-8">
           <Card>
             <CardHeader>
@@ -248,7 +238,6 @@ export default function FeedPage() {
                     Foto
                   </Button>
                 </div>
-
                 <Button type="submit" disabled={posting || (!newPost.trim() && !selectedImage)}>
                   {posting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Publicar

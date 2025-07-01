@@ -1,6 +1,6 @@
 "use client"
+
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Bell, Heart, MessageCircle, UserPlus, Check } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
+import { useRouter } from "next/navigation"
 
 interface Notification {
   _id: string
@@ -26,32 +28,25 @@ interface Notification {
 }
 
 export default function NotificationsPage() {
+  const { user, loading: authLoading, isAuthenticated } = useAuth()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      router.push("/login")
-      return
+    if (!authLoading && isAuthenticated) {
+      fetchNotifications()
+      // Simular notificações em tempo real
+      const interval = setInterval(fetchNotifications, 30000)
+      return () => clearInterval(interval)
     }
-    fetchNotifications()
-
-    // Simular notificações em tempo real
-    const interval = setInterval(fetchNotifications, 30000) // Atualiza a cada 30 segundos
-
-    return () => clearInterval(interval)
-  }, [router])
+  }, [authLoading, isAuthenticated])
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem("token")
       const response = await fetch("/api/notifications", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: "include",
       })
 
       if (response.ok) {
@@ -69,12 +64,9 @@ export default function NotificationsPage() {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const token = localStorage.getItem("token")
       await fetch(`/api/notifications/${notificationId}/read`, {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: "include",
       })
 
       setNotifications((prev) => prev.map((notif) => (notif._id === notificationId ? { ...notif, read: true } : notif)))
@@ -85,12 +77,9 @@ export default function NotificationsPage() {
 
   const markAllAsRead = async () => {
     try {
-      const token = localStorage.getItem("token")
       await fetch("/api/notifications/read-all", {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: "include",
       })
 
       setNotifications((prev) => prev.map((notif) => ({ ...notif, read: true })))
@@ -100,12 +89,10 @@ export default function NotificationsPage() {
   }
 
   const handleNotificationClick = async (notification: Notification) => {
-    // Marcar como lida se não estiver
     if (!notification.read) {
       await markAsRead(notification._id)
     }
 
-    // Navegar baseado no tipo de notificação
     switch (notification.type) {
       case "follow":
         router.push(`/profile/${notification.from._id}`)
@@ -113,7 +100,6 @@ export default function NotificationsPage() {
       case "like":
       case "comment":
         if (notification.postId) {
-          // Por enquanto, vamos para o feed já que não temos página individual de post
           router.push(`/feed`)
         }
         break
@@ -164,7 +150,7 @@ export default function NotificationsPage() {
     }
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -173,6 +159,10 @@ export default function NotificationsPage() {
         </div>
       </div>
     )
+  }
+
+  if (!isAuthenticated) {
+    return null
   }
 
   const unreadCount = notifications.filter((n) => !n.read).length
@@ -198,7 +188,7 @@ export default function NotificationsPage() {
                   variant="outline"
                   size="sm"
                   onClick={markAllAsRead}
-                  className="w-full sm:w-auto text-xs sm:text-sm"
+                  className="w-full sm:w-auto text-xs sm:text-sm bg-transparent"
                 >
                   <Check className="h-4 w-4 mr-1 sm:mr-2" />
                   <span className="hidden xs:inline">Marcar todas como lidas</span>
@@ -265,4 +255,3 @@ export default function NotificationsPage() {
     </div>
   )
 }
-

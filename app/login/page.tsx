@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -33,15 +32,18 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
+        credentials: "include", // Importante: inclui cookies na requisição
       })
 
       const data = await response.json()
 
       if (response.ok) {
-        localStorage.setItem("token", data.token)
+
         router.push("/feed")
+
+        router.refresh() // Força refresh para atualizar o estado de auth
       } else {
-        setError(data.error || "Erro ao fazer login")
+        setError(data.message || "Erro ao fazer login")
       }
     } catch (error) {
       setError("Erro de conexão. Tente novamente.")
@@ -66,7 +68,6 @@ export default function LoginPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -78,7 +79,6 @@ export default function LoginPage() {
                 required
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
               <Input
@@ -90,13 +90,11 @@ export default function LoginPage() {
                 required
               />
             </div>
-
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Entrar
             </Button>
           </form>
-
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Não tem uma conta?{" "}

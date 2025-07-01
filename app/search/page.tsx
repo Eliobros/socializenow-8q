@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Search, UserPlus, UserCheck, MessageCircle } from "lucide-react"
+import { useAuth } from "@/hooks/useAuth"
 
 interface User {
   _id: string
@@ -24,6 +25,7 @@ interface User {
 }
 
 export default function SearchPage() {
+  const { user, loading: authLoading, isAuthenticated } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(false)
@@ -32,26 +34,18 @@ export default function SearchPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem("token")
-    if (!token) {
-      router.push("/login")
-      return
+    if (!authLoading && isAuthenticated) {
+      searchUsers("")
     }
-
-    // Buscar usuários populares inicialmente
-    searchUsers("")
-  }, [router])
+  }, [authLoading, isAuthenticated])
 
   const searchUsers = async (query: string) => {
     setLoading(true)
     setError("")
 
     try {
-      const token = localStorage.getItem("token")
       const response = await fetch(`/api/search/users?q=${encodeURIComponent(query)}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: "include",
       })
 
       if (response.ok) {
@@ -74,13 +68,12 @@ export default function SearchPage() {
 
   const handleFollow = async (userId: string) => {
     try {
-      const token = localStorage.getItem("token")
       const response = await fetch("/api/follow", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include",
         body: JSON.stringify({ userId }),
       })
 
@@ -99,13 +92,12 @@ export default function SearchPage() {
 
   const handleUnfollow = async (userId: string) => {
     try {
-      const token = localStorage.getItem("token")
       const response = await fetch("/api/follow", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include",
         body: JSON.stringify({ userId }),
       })
 
@@ -128,13 +120,12 @@ export default function SearchPage() {
 
   const startConversation = async (userId: string) => {
     try {
-      const token = localStorage.getItem("token")
       const response = await fetch("/api/messages/conversations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include",
         body: JSON.stringify({ userId }),
       })
 
@@ -148,14 +139,29 @@ export default function SearchPage() {
   }
 
   const getInitials = (name?: string) => {
-  if (!name) return "??"
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2)
-}
+    if (!name) return "??"
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -202,45 +208,50 @@ export default function SearchPage() {
               </Card>
             </div>
           ) : (
-            users.map((user) => (
-              <Card key={user._id} className="hover:shadow-lg transition-shadow">
+            users.map((searchUser) => (
+              <Card key={searchUser._id} className="hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex flex-col items-center text-center">
                     <Avatar className="h-20 w-20 mb-4">
-                      <AvatarImage src={user.avatar || "/placeholder.svg"} />
+                      <AvatarImage src={searchUser.avatar || "/placeholder.svg"} />
                       <AvatarFallback className="bg-blue-600 text-white text-lg">
-                        {getInitials(user.name)}
+                        {getInitials(searchUser.name)}
                       </AvatarFallback>
                     </Avatar>
 
-                    <h3 className="font-semibold text-lg mb-1">{user.name}</h3>
-                    {user.username && <p className="text-gray-600 text-sm mb-2">@{user.username}</p>}
-                    {user.bio && <p className="text-gray-700 text-sm mb-4 line-clamp-2">{user.bio}</p>}
+                    <h3 className="font-semibold text-lg mb-1">{searchUser.name}</h3>
+                    {searchUser.username && <p className="text-gray-600 text-sm mb-2">@{searchUser.username}</p>}
+                    {searchUser.bio && <p className="text-gray-700 text-sm mb-4 line-clamp-2">{searchUser.bio}</p>}
 
                     <div className="flex gap-4 mb-4 text-sm">
                       <div className="text-center">
-                        <div className="font-bold">{user.followers}</div>
+                        <div className="font-bold">{searchUser.followers}</div>
                         <div className="text-gray-600">Seguidores</div>
                       </div>
                       <div className="text-center">
-                        <div className="font-bold">{user.following}</div>
+                        <div className="font-bold">{searchUser.following}</div>
                         <div className="text-gray-600">Seguindo</div>
                       </div>
                     </div>
 
                     <div className="flex gap-2 w-full">
-                      {user.isFollowing ? (
-                        <Button variant="outline" size="sm" onClick={() => handleUnfollow(user._id)} className="flex-1">
+                      {searchUser.isFollowing ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUnfollow(searchUser._id)}
+                          className="flex-1"
+                        >
                           <UserCheck className="h-4 w-4 mr-2" />
                           Seguindo
                         </Button>
                       ) : (
-                        <Button size="sm" onClick={() => handleFollow(user._id)} className="flex-1">
+                        <Button size="sm" onClick={() => handleFollow(searchUser._id)} className="flex-1">
                           <UserPlus className="h-4 w-4 mr-2" />
                           Seguir
                         </Button>
                       )}
-                      <Button variant="outline" size="sm" onClick={() => startConversation(user._id)}>
+                      <Button variant="outline" size="sm" onClick={() => startConversation(searchUser._id)}>
                         <MessageCircle className="h-4 w-4" />
                       </Button>
                     </div>

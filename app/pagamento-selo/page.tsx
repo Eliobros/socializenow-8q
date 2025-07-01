@@ -49,54 +49,49 @@ export default function PagamentoSelo() {
     }
   }
 
-  const pagar = async () => {
-    // Validação simples dos campos
-    if (!numero || numero.length < 9) {
-      alert("Por favor, insira um número válido.")
-      return
-    }
-    if (!nome) {
-      alert("Por favor, insira o nome completo.")
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const endpoint =
-        metodoPagamento === "Mpesa"
-          ? "https://paymoz.tech/api/c2b/mpesa/send"
-          : "https://paymoz.tech/api/c2b/emola/send"
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.NEXT_PUBLIC_PAYMOZ_API_KEY || "pk_your_api_key_here",
-        },
-        body: JSON.stringify({
-          numero_destino: numero,
-          valor: 50, // valor fixo 50MT conforme solicitado
-          descricao: `Pagamento do selo de verificação para ${nome}`,
-        }),
-      })
-
-      const data = await response.json()
-      console.log("Resposta da API:", data)
-
-      if (data.success) {
-        alert("Pagamento iniciado com sucesso. Verifique seu telefone para confirmar.")
-        router.push("/verifica")
-      } else {
-        alert("Erro ao iniciar pagamento: " + (data.message || "Erro desconhecido"))
-      }
-    } catch (error) {
-      console.error(error)
-      alert("Erro ao iniciar pagamento.")
-    } finally {
-      setLoading(false)
-    }
+const pagar = async () => {
+  if (!numero || !nome) {
+    alert("Preencha todos os campos obrigatórios")
+    return
   }
+
+  setLoading(true)
+
+  try {
+    const response = await fetch("https://mozpayment.co.mz/api/1.1/wf/white-checkout", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        carteira: process.env.NEXT_PUBLIC_CARTEIRA_ID,
+        numero,
+        nome,
+        valor: "10",
+        meio_de_pagamento: metodoPagamento,
+        email,
+        return_url: `${window.location.origin}/verifica`,
+      }),
+    })
+
+    const url = await response.text()
+    console.log("URL do pagamento:", url)
+
+    if (!url) {
+      alert("Erro: URL de checkout não recebida.")
+      setLoading(false)
+      return
+    }
+
+    window.location.href = url
+  } catch (err) {
+    console.error(err)
+    alert("Erro ao iniciar pagamento.")
+  } finally {
+    setLoading(false)
+  }
+}
+
 
   if (!user) {
     return (
@@ -139,7 +134,7 @@ export default function PagamentoSelo() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Valor:</span>
-              <span className="font-bold text-lg text-blue-600">50 MT</span>
+              <span className="font-bold text-lg text-blue-600">10 MT</span>
             </div>
           </CardContent>
         </Card>
@@ -232,7 +227,7 @@ export default function PagamentoSelo() {
                 ) : (
                   <>
                     <CreditCard className="h-4 w-4 mr-2" />
-                    Pagar 50 MT
+                    Pagar 10 MT
                   </>
                 )}
               </Button>
@@ -241,7 +236,7 @@ export default function PagamentoSelo() {
         </Card>
 
         <div className="text-center mt-6 text-sm text-gray-500">
-          <p>Pagamento seguro processado via MozPayment</p>
+          <p>Pagamento seguro processado via EliobrosPayment API</p>
         </div>
       </div>
     </div>
