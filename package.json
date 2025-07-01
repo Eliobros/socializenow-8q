@@ -53,10 +53,7 @@
     "cloudinary": "^2.6.0",
     "clsx": "^2.1.1",
     "cmdk": "1.0.0",
-<<<<<<< HEAD
-=======
     "cookie": "^1.0.2",
->>>>>>> 8fd01f3 (de novo)
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.5.1",
     "input-otp": "^1.4.1",
@@ -73,13 +70,10 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.0",
     "react-resizable-panels": "^2.1.7",
-<<<<<<< HEAD
     "recharts": "^2.13.3",
-=======
     "react-toastify": "^11.0.5",
     "recharts": "^2.13.3",
     "resend": "^4.6.0",
->>>>>>> 8fd01f3 (de novo)
     "simple-peer": "^9.11.1",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
@@ -91,10 +85,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-<<<<<<< HEAD
-=======
     "@types/bcrypt": "^5.0.2",
->>>>>>> 8fd01f3 (de novo)
     "@types/simple-peer": "^9.11.8",
     "eslint": "^8",
     "eslint-config-next": "15.1.3",
