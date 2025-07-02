@@ -1,33 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import jwt from "jsonwebtoken"
+import { withAuth, getAuthUser } from "@/lib/withAuth"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 import cloudinary from "@/lib/cloudinary"
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization")
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-  try {
-    return jwt.verify(token, JWT_SECRET) as any
-  } catch (error) {
-    return null
-  }
-}
-
 // GET - Buscar stories dos usuários seguidos
-export async function GET(request: NextRequest) {
+async function getStories(request: NextRequest) {
   try {
-    const user = verifyToken(request)
-    if (!user) {
-      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
-    }
-
+    const user = getAuthUser(request)
     const client = await clientPromise
     const db = client.db("socializenow")
     const stories = db.collection("stories")
@@ -44,7 +24,7 @@ export async function GET(request: NextRequest) {
     const followingIds = following.map((f) => f.following)
     followingIds.push(new ObjectId(user.userId)) // Incluir próprios stories
 
-    // Buscar stories dos últimas 24 horas
+    // Buscar stories das últimas 24 horas
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
     const userStories = await stories
@@ -107,12 +87,9 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - Criar novo story
-export async function POST(request: NextRequest) {
+async function createStory(request: NextRequest) {
   try {
-    const user = verifyToken(request)
-    if (!user) {
-      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
-    }
+    const user = getAuthUser(request)
 
     const formData = await request.formData()
     const content = (formData.get("content") as string) || ""
@@ -134,7 +111,11 @@ export async function POST(request: NextRequest) {
             {
               resource_type: "image",
               folder: "stories",
-              transformation: [{ width: 1080, height: 1920, crop: "limit" }, { quality: "auto" }, { format: "auto" }],
+              transformation: [
+                { width: 1080, height: 1920, crop: "limit" },
+                { quality: "auto" },
+                { format: "auto" },
+              ],
             },
             (error, result) => {
               if (error) reject(error)
@@ -172,3 +153,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
+
+// Exportações protegidas com withAuth
+export const GET = withAuth(getStories)
+export const POST = withAuth(createStory)
