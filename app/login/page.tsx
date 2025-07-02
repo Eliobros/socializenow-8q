@@ -25,6 +25,8 @@ export default function LoginPage() {
     setError("")
     setLoading(true)
 
+    console.log("🔄 Iniciando login...")
+
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -32,21 +34,33 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
-        credentials: "include", // Importante para enviar/receber cookies
+        credentials: "include",
       })
 
-      console.log("[Frontend] Response status:", response.status)
-      console.log("[Frontend] Cookies atuais:", document.cookie)
+      console.log("📡 Resposta do login:", response.status)
 
       const data = await response.json()
+      console.log("📦 Dados recebidos:", data)
 
       if (response.ok) {
+        console.log("✅ Login bem-sucedido!")
+
+        // Verificar se o cookie foi criado
+        console.log("🍪 Cookies:", document.cookie)
+
+        console.log("🔄 Redirecionando para /feed...")
         router.push("/feed")
-        router.refresh() // Atualiza estado auth
+
+        // Forçar refresh da página
+        setTimeout(() => {
+          window.location.href = "/feed"
+        }, 100)
       } else {
+        console.log("❌ Erro no login:", data.message)
         setError(data.message || "Erro ao fazer login")
       }
     } catch (error) {
+      console.error("💥 Erro de conexão:", error)
       setError("Erro de conexão. Tente novamente.")
     } finally {
       setLoading(false)
