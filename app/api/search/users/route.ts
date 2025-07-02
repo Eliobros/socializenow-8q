@@ -1,33 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server"
-import jwt from "jsonwebtoken"
+import { withAuth, getAuthUser } from "@/lib/withAuth"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization")
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
+async function searchUsers(request: NextRequest) {
   try {
-    return jwt.verify(token, JWT_SECRET) as any
-  } catch (error) {
-    return null
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const user = verifyToken(request)
+    const user = getAuthUser(request)
     if (!user) {
-      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
+      return NextResponse.json({ error: "Usuário não autenticado" }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
-    const query = searchParams.get("q") || ""
+    const query = searchParams.get("q")?.trim() || ""
 
     const client = await clientPromise
     const db = client.db("socializenow")
@@ -35,10 +19,10 @@ export async function GET(request: NextRequest) {
     const follows = db.collection("follows")
 
     const searchQuery: any = {
-      _id: { $ne: new ObjectId(user.userId) }, // Exclude current user
+      _id: { $ne: new ObjectId(user.userId) },
     }
 
-    if (query.trim()) {
+    if (query) {
       searchQuery.$or = [
         { name: { $regex: query, $options: "i" } },
         { username: { $regex: query, $options: "i" } },
@@ -46,17 +30,13 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    // Get users
     const usersList = await users
       .find(searchQuery, {
-        projection: {
-          password: 0,
-        },
+        projection: { password: 0 },
       })
       .limit(20)
       .toArray()
 
-    // Get following status for each user
     const usersWithFollowStatus = await Promise.all(
       usersList.map(async (foundUser) => {
         const isFollowing = await follows.findOne({
@@ -69,8 +49,8 @@ export async function GET(request: NextRequest) {
           username: foundUser.username || "",
           bio: foundUser.bio || "",
           avatar: foundUser.avatar || "",
-          followers: foundUser.followers || 0,
-          following: foundUser.following || 0,
+          followers: foundUser.followers ?? 0,
+          following: foundUser.following ?? 0,
           isFollowing: !!isFollowing,
         }
       }),
@@ -82,3 +62,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
+
+export const GET = withAuth(searchUsers)
