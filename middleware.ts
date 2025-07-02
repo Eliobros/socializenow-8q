@@ -4,46 +4,47 @@ import jwt from "jsonwebtoken"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret"
 
-const protectedRoutes = ["/feed", "/profile", "/settings", "/messages", "/notifications", "/search"]
+// Rotas protegidas
+const protectedRoutes = ["/feed", "/profile", "/settings", "/messages"]
+
+// Rotas públicas para login/cadastro
 const authRoutes = ["/login", "/register"]
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const token = request.cookies.get("auth-token")?.value
 
-  console.log("🛡️ Middleware para:", pathname)
-  console.log("🔑 Token recebido:", token)
-
   const isProtected = protectedRoutes.some((route) => pathname.startsWith(route))
-  const isAuth = authRoutes.some((route) => pathname.startsWith(route))
+  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
 
   if (token) {
     try {
-      jwt.verify(token, JWT_SECRET)
-      console.log("✅ Token válido")
+      const decoded = jwt.verify(token, JWT_SECRET)
+      console.log("✅ Token válido:", decoded)
 
-      if (isAuth) {
-        // Usuário logado não deve acessar login/register
-        console.log("🔄 Usuário logado tenta acessar auth route, redirecionando para /feed")
+      if (isAuthRoute) {
+        // Usuário logado tenta acessar página de login → redirecione
         return NextResponse.redirect(new URL("/feed", request.url))
       }
 
-      // Token válido e rota permitida
       return NextResponse.next()
-    } catch (e) {
-      console.log("❌ Token inválido:", e)
-      // Token inválido, delete cookie e redireciona se rota protegida
-      const res = isProtected ? NextResponse.redirect(new URL("/login", request.url)) : NextResponse.next()
-      res.cookies.delete("auth-token")
-      return res
+    } catch (e: any) {
+      console.error("❌ Token inválido:", e.message)
+
+      // Se for TokenExpiredError ou JsonWebTokenError
+      const response = isProtected
+        ? NextResponse.redirect(new URL("/login", request.url))
+        : NextResponse.next()
+
+      response.cookies.delete("auth-token")
+      return response
     }
   } else {
-    // Sem token
     if (isProtected) {
-      console.log("❌ Sem token em rota protegida, redirecionando para /login")
+      console.log("🔒 Tentativa de acesso sem token")
       return NextResponse.redirect(new URL("/login", request.url))
     }
-    // Rota pública, libera acesso
+
     return NextResponse.next()
   }
 }
