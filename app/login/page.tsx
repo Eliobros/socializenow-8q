@@ -34,10 +34,10 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
-        credentials: "include", // 🔑 permite salvar cookies enviados pelo backend
+        credentials: "include", // 👉 Importante para receber cookies HTTP-only
       })
 
-      console.log("📡 Resposta do login:", response.status)
+      console.log("📡 Resposta do servidor:", response.status)
 
       const data = await response.json()
       console.log("📦 Dados recebidos:", data)
@@ -45,15 +45,17 @@ export default function LoginPage() {
       if (response.ok) {
         console.log("✅ Login bem-sucedido!")
 
-        // ✅ Redirecionamento direto — não checa cookie HttpOnly
-        console.log("🔄 Redirecionando para feed...")
-        window.location.href = "/feed"
+        // ⏳ Garantir que o navegador tenha tempo de salvar o cookie
+        setTimeout(() => {
+          console.log("🔄 Redirecionando para /feed")
+          router.push("/feed") // 👉 Navegação suave com router.push
+        }, 100)
       } else {
         console.log("❌ Erro no login:", data.message)
         setError(data.message || "Erro ao fazer login")
       }
-    } catch (error) {
-      console.error("💥 Erro de conexão:", error)
+    } catch (err) {
+      console.error("💥 Erro na requisição:", err)
       setError("Erro de conexão. Tente novamente.")
     } finally {
       setLoading(false)
