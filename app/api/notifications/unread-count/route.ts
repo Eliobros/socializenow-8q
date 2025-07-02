@@ -1,31 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import jwt from "jsonwebtoken"
+import { withAuth, getAuthUser } from "@/lib/withAuth"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization")
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
+// GET - Buscar quantidade de notificações não lidas
+async function getUnreadNotifications(request: NextRequest) {
   try {
-    return jwt.verify(token, JWT_SECRET) as any
-  } catch (error) {
-    return null
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const user = verifyToken(request)
-    if (!user) {
-      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
-    }
-
+    const user = getAuthUser(request)
     const client = await clientPromise
     const db = client.db("socializenow")
     const notifications = db.collection("notifications")
@@ -37,7 +18,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ count })
   } catch (error) {
-    console.error("Get unread notifications count error:", error)
+    console.error("Erro ao buscar notificações não lidas:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
+
+// Exportação protegida com withAuth
+export const GET = withAuth(getUnreadNotifications)
