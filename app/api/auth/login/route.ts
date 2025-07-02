@@ -3,7 +3,6 @@ import clientPromise from "@/lib/mongodb"
 import { compare } from "bcrypt"
 import type { User } from "@/types/user"
 import jwt from "jsonwebtoken"
-import { serialize } from "cookie"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret"
 
@@ -11,8 +10,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { email, password } = body
-
-    console.log("[API Login] Recebendo login para:", email)
 
     if (!email || !password) {
       return NextResponse.json({ message: "Invalid credentials" }, { status: 400 })
@@ -48,20 +45,9 @@ export async function POST(req: NextRequest) {
       { expiresIn: "7d" },
     )
 
-    console.log("[API Login] Token criado:", token)
-
-    const cookie = serialize("auth-token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    })
-
-    console.log("[API Login] Setando cookie com token e retornando sucesso")
-
-    const response = new NextResponse(
-      JSON.stringify({
+    // Criar resposta com cookie seguro
+    const response = NextResponse.json(
+      {
         message: "Login successful",
         user: {
           id: user._id,
@@ -69,15 +55,22 @@ export async function POST(req: NextRequest) {
           name: user.name,
           avatar: profileInfo?.avatar,
         },
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Set-Cookie": cookie,
-        },
-      }
+      },
+      { status: 200 },
     )
+
+    // Definir cookie HTTP-only seguro
+    response.cookies.set({
+      name: "auth-token",
+      value: token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 dias
+      path: "/",
+    })
+
+    console.log("🍪 Cookie definido:", token.substring(0, 20) + "...")
 
     return response
   } catch (error) {
