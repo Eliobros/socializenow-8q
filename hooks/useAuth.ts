@@ -31,21 +31,26 @@ export function useAuth() {
   }, [])
 
   const checkAuth = async () => {
+    console.log("🔍 Verificando autenticação...")
+
     try {
       const response = await fetch("/api/auth/me", {
-        credentials: "include", // Inclui cookies
+        credentials: "include",
       })
+
+      console.log("📡 Resposta do /api/auth/me:", response.status)
 
       if (response.ok) {
         const data = await response.json()
+        console.log("👤 Usuário autenticado:", data.user)
         setUser(data.user)
       } else {
-        // Não está autenticado, redireciona para login
-        router.push("/login")
+        console.log("❌ Não autenticado")
+        setUser(null)
       }
     } catch (error) {
-      console.error("Erro ao verificar autenticação:", error)
-      router.push("/login")
+      console.error("💥 Erro ao verificar autenticação:", error)
+      setUser(null)
     } finally {
       setLoading(false)
     }
