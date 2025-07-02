@@ -32,17 +32,20 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
-        credentials: "include", // Importante: inclui cookies na requisição
+        credentials: "include", // Importante para enviar/receber cookies
       })
+
+      console.log("[Frontend] Response status:", response.status)
+      console.log("[Frontend] Cookies atuais:", document.cookie)
 
       const data = await response.json()
 
-     if (response.ok) {
-  router.refresh()
-  router.push("/feed")
-} else {
-  setError(data.message || "Erro ao fazer login")
-}
+      if (response.ok) {
+        router.push("/feed")
+        router.refresh() // Atualiza estado auth
+      } else {
+        setError(data.message || "Erro ao fazer login")
+      }
     } catch (error) {
       setError("Erro de conexão. Tente novamente.")
     } finally {
