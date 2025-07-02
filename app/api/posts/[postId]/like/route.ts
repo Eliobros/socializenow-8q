@@ -1,29 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import jwt from "jsonwebtoken"
+import { withAuth, getAuthUser } from "@/lib/withAuth"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization")
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
+async function toggleLike(request: NextRequest, { params }: { params: { postId: string } }) {
   try {
-    return jwt.verify(token, JWT_SECRET) as any
-  } catch (error) {
-    return null
-  }
-}
-
-export async function POST(request: NextRequest, { params }: { params: { postId: string } }) {
-  try {
-    const user = verifyToken(request)
+    const user = getAuthUser(request)
     if (!user) {
-      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
+      return NextResponse.json({ error: "Usuário não autenticado" }, { status: 401 })
     }
 
     const { postId } = params
@@ -35,55 +19,63 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
     const db = client.db("socializenow")
     const posts = db.collection("posts")
     const likes = db.collection("likes")
+    const users = db.collection("users")
+    const notifications = db.collection("notifications")
 
     const userId = new ObjectId(user.userId)
     const postObjectId = new ObjectId(postId)
 
-    // Check if user already liked this post
+    // Verifica se o post existe
+    const post = await posts.findOne({ _id: postObjectId })
+    if (!post) {
+      return NextResponse.json({ error: "Post não encontrado" }, { status: 404 })
+    }
+
+    // Verifica se o usuário já curtiu
     const existingLike = await likes.findOne({
-      userId: userId,
+      userId,
       postId: postObjectId,
     })
 
     let liked = false
+
     if (existingLike) {
-      // Unlike the post
+      // Descurtir
       await likes.deleteOne({ _id: existingLike._id })
       await posts.updateOne({ _id: postObjectId }, { $inc: { likes: -1 } })
     } else {
-      // Like the post
+      // Curtir
       await likes.insertOne({
-        userId: userId,
+        userId,
         postId: postObjectId,
         createdAt: new Date(),
       })
       await posts.updateOne({ _id: postObjectId }, { $inc: { likes: 1 } })
       liked = true
 
-      // Create notification for post author
-      const post = await posts.findOne({ _id: postObjectId })
-      if (post && !post.authorId.equals(userId)) {
-        const notifications = db.collection("notifications")
+      // Busca o nome do usuário para notificação
+      const currentUser = await users.findOne({ _id: userId })
+      if (post.authorId.toString() !== user.userId && currentUser) {
         await notifications.insertOne({
           userId: post.authorId,
+          fromUserId: userId,
           type: "like",
-          message: `${user.name} curtiu seu post`,
+          message: `${currentUser.name} curtiu seu post`,
           read: false,
           createdAt: new Date(),
         })
       }
     }
 
-    // Get updated like count
+    // Atualiza a contagem de likes
     const updatedPost = await posts.findOne({ _id: postObjectId })
     const likeCount = updatedPost?.likes || 0
 
-    return NextResponse.json({
-      liked,
-      likes: likeCount,
-    })
+    return NextResponse.json({ liked, likes: likeCount })
   } catch (error) {
     console.error("Like post error:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
+
+export const POST = withAuth(toggleLike)
