@@ -55,20 +55,19 @@ export default function ProfilePage() {
   }
 
   const fetchUserPosts = async () => {
-    try {
-      const response = await fetch("/api/profile/posts", {
-        credentials: "include",
-      })
-      const data = await response.json()
-      setPosts(data)
-    } catch (error) {
-      console.error("Error fetching user posts:", error)
-      toast.error("Error fetching user posts")
-    } finally {
-      setLoading(false)
-    }
+  try {
+    const response = await fetch("/api/profile/posts", {
+      credentials: "include",
+    })
+    const data = await response.json()
+    setPosts(data.posts || [])  // <-- aqui a correção
+  } catch (error) {
+    console.error("Error fetching user posts:", error)
+    toast.error("Error fetching user posts")
+  } finally {
+    setLoading(false)
   }
-
+}
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       fetchProfile()
