@@ -1,33 +1,46 @@
 import { type NextRequest, NextResponse } from "next/server"
-import jwt from "jsonwebtoken"
+import { withAuth, getAuthUser } from "@/lib/withAuth"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 import cloudinary from "@/lib/cloudinary"
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization")
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
+// Função auxiliar pra upload da imagem no Cloudinary
+async function uploadImage(image: File) {
   try {
-    return jwt.verify(token, JWT_SECRET) as any
+    const bytes = await image.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader
+        .upload_stream(
+          {
+            resource_type: "image",
+            folder: "message_images",
+            transformation: [
+              { width: 800, height: 600, crop: "limit" },
+              { quality: "auto" },
+              { format: "auto" },
+            ],
+          },
+          (error, result) => {
+            if (error) reject(error)
+            else resolve(result)
+          }
+        )
+        .end(buffer)
+    })
   } catch (error) {
-    return null
+    console.error("Erro ao converter imagem:", error)
+    throw new Error("Erro ao processar imagem")
   }
 }
 
-export async function POST(request: NextRequest) {
+// POST - Enviar nova mensagem
+async function sendMessage(request: NextRequest) {
   try {
-    const user = verifyToken(request)
-    if (!user) {
-      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
-    }
-
+    const user = getAuthUser(request)
     const contentType = request.headers.get("content-type")
+
     let conversationId: string
     let content: string
     let imageUrl: string | null = null
@@ -48,30 +61,8 @@ export async function POST(request: NextRequest) {
 
       if (image) {
         try {
-          const bytes = await image.arrayBuffer()
-          const buffer = Buffer.from(bytes)
-
-          const uploadResponse = (await new Promise((resolve, reject) => {
-            cloudinary.uploader
-              .upload_stream(
-                {
-                  resource_type: "image",
-                  folder: "message_images",
-                  transformation: [
-                    { width: 800, height: 600, crop: "limit" },
-                    { quality: "auto" },
-                    { format: "auto" }
-                  ],
-                },
-                (error, result) => {
-                  if (error) reject(error)
-                  else resolve(result)
-                },
-              )
-              .end(buffer)
-          })) as any
-
-          imageUrl = uploadResponse.secure_url
+          const uploadResult = await uploadImage(image)
+          imageUrl = (uploadResult as any).secure_url
         } catch (error) {
           console.error("Erro no upload da imagem:", error)
           return NextResponse.json({ error: "Erro ao fazer upload da imagem" }, { status: 500 })
@@ -92,12 +83,17 @@ export async function POST(request: NextRequest) {
     const messages = db.collection("messages")
     const conversations = db.collection("conversations")
 
-    const conversation = await conversations.findOne({ _id: new ObjectId(conversationId) })
+    const conversation = await conversations.findOne({
+      _id: new ObjectId(conversationId),
+    })
+
     if (!conversation) {
       return NextResponse.json({ error: "Conversa não encontrada" }, { status: 404 })
     }
 
-    const receiverId = conversation.participants.find((p: ObjectId) => !p.equals(new ObjectId(user.userId)))
+    const receiverId = conversation.participants.find(
+      (p: ObjectId) => !p.equals(new ObjectId(user.userId))
+    )
 
     const messageData: any = {
       conversationId: new ObjectId(conversationId),
@@ -115,6 +111,7 @@ export async function POST(request: NextRequest) {
     const result = await messages.insertOne(messageData)
 
     const lastMessageContent = imageUrl ? content.trim() || "📷 Imagem" : content.trim()
+
     await conversations.updateOne(
       { _id: new ObjectId(conversationId) },
       {
@@ -135,11 +132,13 @@ export async function POST(request: NextRequest) {
       data: {
         ...messageData,
         _id: result.insertedId,
-      }
+      },
     })
   } catch (error) {
-    console.error("Send message error:", error)
+    console.error("Erro ao enviar mensagem:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
 
+// Exportação protegida com withAuth
+export const POST = withAuth(sendMessage)
