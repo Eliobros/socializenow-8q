@@ -45,16 +45,24 @@ export default function LoginPage() {
       if (response.ok) {
         console.log("✅ Login bem-sucedido!")
 
+        // Aguardar um pouco para o cookie ser definido
+        await new Promise((resolve) => setTimeout(resolve, 500))
+
         // Verificar se o cookie foi criado
-        console.log("🍪 Cookies:", document.cookie)
+        console.log("🍪 Todos os cookies:", document.cookie)
 
-        console.log("🔄 Redirecionando para /feed...")
-        router.push("/feed")
+        // Verificar especificamente o auth-token
+        const hasAuthToken = document.cookie.includes("auth-token")
+        console.log("🔑 Cookie auth-token existe:", hasAuthToken)
 
-        // Forçar refresh da página
-        setTimeout(() => {
+        if (hasAuthToken) {
+          console.log("🔄 Cookie encontrado, redirecionando...")
+          // Usar window.location para forçar navegação
           window.location.href = "/feed"
-        }, 100)
+        } else {
+          console.log("❌ Cookie não foi criado!")
+          setError("Erro na autenticação. Tente novamente.")
+        }
       } else {
         console.log("❌ Erro no login:", data.message)
         setError(data.message || "Erro ao fazer login")
