@@ -37,14 +37,12 @@ export default function LoginPage() {
 
       const data = await response.json()
 
-      if (response.ok) {
-
-        router.push("/feed")
-
-        router.refresh() // Força refresh para atualizar o estado de auth
-      } else {
-        setError(data.message || "Erro ao fazer login")
-      }
+     if (response.ok) {
+  router.refresh()
+  router.push("/feed")
+} else {
+  setError(data.message || "Erro ao fazer login")
+}
     } catch (error) {
       setError("Erro de conexão. Tente novamente.")
     } finally {
