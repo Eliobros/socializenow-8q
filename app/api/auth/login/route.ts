@@ -3,7 +3,6 @@ import clientPromise from "@/lib/mongodb"
 import { compare } from "bcrypt"
 import type { User } from "@/types/user"
 import jwt from "jsonwebtoken"
-import { serialize } from "cookie"
 
 const JWT_SECRET = process.env.JWT_SECRET || "secret"
 
@@ -13,7 +12,7 @@ export async function POST(req: NextRequest) {
     const { email, password } = body
 
     if (!email || !password) {
-      return NextResponse.json({ message: "Invalid credentials" }, { status: 400 })
+      return NextResponse.json({ message: "Credenciais inválidas" }, { status: 400 })
     }
 
     const client = await clientPromise
@@ -23,13 +22,13 @@ export async function POST(req: NextRequest) {
     const user = await users.findOne({ email })
 
     if (!user) {
-      return NextResponse.json({ message: "Invalid credentials" }, { status: 400 })
+      return NextResponse.json({ message: "Credenciais inválidas" }, { status: 400 })
     }
 
     const isPasswordValid = await compare(password, user.password)
 
     if (!isPasswordValid) {
-      return NextResponse.json({ message: "Invalid credentials" }, { status: 400 })
+      return NextResponse.json({ message: "Credenciais inválidas" }, { status: 400 })
     }
 
     const profiles = db.collection("profiles")
@@ -43,41 +42,30 @@ export async function POST(req: NextRequest) {
         avatar: profileInfo?.avatar,
       },
       JWT_SECRET,
-      { expiresIn: "7d" },
+      { expiresIn: "7d" }
     )
 
-    // Serializar o cookie
-    const cookie = serialize("auth-token", token, {
+    const response = NextResponse.json({
+      message: "Login efetuado com sucesso",
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        avatar: profileInfo?.avatar,
+      },
+    })
+
+    response.cookies.set("auth-token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * 7, // 7 dias
       path: "/",
     })
 
-    // Criar resposta com cabeçalho Set-Cookie
-    const response = new NextResponse(
-      JSON.stringify({
-        message: "Login successful",
-        user: {
-          id: user._id,
-          email: user.email,
-          name: user.name,
-          avatar: profileInfo?.avatar,
-        },
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Set-Cookie": cookie,
-        },
-      }
-    )
-
     return response
   } catch (error) {
-    console.error(error)
-    return NextResponse.json({ message: "Something went wrong!" }, { status: 500 })
+    console.error("[LOGIN_ERROR]", error)
+    return NextResponse.json({ message: "Erro interno no servidor" }, { status: 500 })
   }
 }
