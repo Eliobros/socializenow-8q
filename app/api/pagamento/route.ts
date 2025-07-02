@@ -1,20 +1,25 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { withAuth, getAuthUser } from "@/lib/withAuth"
+import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 
-export async function POST(req: NextRequest) {
+async function createPayment(req: NextRequest) {
   try {
+    const user = getAuthUser(req)
+    if (!user) {
+      return NextResponse.json({ success: false, message: "Não autorizado" }, { status: 401 })
+    }
+
     const client = await clientPromise
     const db = client.db("socializenow")
     const payments = db.collection("payments")
 
     const data = await req.json()
 
-    // Validar dados obrigatórios
     if (!data.numero || !data.nome || !data.valor) {
       return NextResponse.json({ success: false, message: "Dados obrigatórios não fornecidos" }, { status: 400 })
     }
 
-    // Criar registro de pagamento
     const pagamento = await payments.insertOne({
       numero: data.numero,
       nome: data.nome,
@@ -25,6 +30,7 @@ export async function POST(req: NextRequest) {
       tipo: "selo_verificacao",
       createdAt: new Date(),
       updatedAt: new Date(),
+      createdBy: new ObjectId(user.userId), // opcional, pra saber quem criou o pagamento
     })
 
     return NextResponse.json({
@@ -40,8 +46,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
+async function listPayments(req: NextRequest) {
   try {
+    const user = getAuthUser(req)
+    if (!user) {
+      return NextResponse.json({ success: false, message: "Não autorizado" }, { status: 401 })
+    }
+
     const client = await clientPromise
     const db = client.db("socializenow")
     const payments = db.collection("payments")
@@ -62,3 +73,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, message: "Erro interno do servidor" }, { status: 500 })
   }
 }
+
+export const POST = withAuth(createPayment)
+export const GET = withAuth(listPayments)
