@@ -13,7 +13,7 @@ function verifyToken(request: NextRequest) {
 
   const token = authHeader.substring(7)
   try {
-    return jwt.verify(token, JWT_SECRET) as any
+    return jwt.verify(token, JWT_SECRET) as { userId: string; [key: string]: any }
   } catch (error) {
     return null
   }
@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
     const db = client.db("socializenow")
     const posts = db.collection("posts")
 
-    // Get user's posts with author information
     const userPosts = await posts
       .aggregate([
         {
@@ -52,7 +51,7 @@ export async function GET(request: NextRequest) {
             content: 1,
             createdAt: 1,
             likes: 1,
-	    image: 1,
+            image: 1,
             "author.name": 1,
             "author.email": 1,
           },
