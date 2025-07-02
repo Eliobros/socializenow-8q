@@ -34,7 +34,7 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
-        credentials: "include",
+        credentials: "include", // 🔑 permite salvar cookies enviados pelo backend
       })
 
       console.log("📡 Resposta do login:", response.status)
@@ -45,24 +45,9 @@ export default function LoginPage() {
       if (response.ok) {
         console.log("✅ Login bem-sucedido!")
 
-        // Aguardar um pouco para o cookie ser definido
-        await new Promise((resolve) => setTimeout(resolve, 500))
-
-        // Verificar se o cookie foi criado
-        console.log("🍪 Todos os cookies:", document.cookie)
-
-        // Verificar especificamente o auth-token
-        const hasAuthToken = document.cookie.includes("auth-token")
-        console.log("🔑 Cookie auth-token existe:", hasAuthToken)
-
-        if (hasAuthToken) {
-          console.log("🔄 Cookie encontrado, redirecionando...")
-          // Usar window.location para forçar navegação
-          window.location.href = "/feed"
-        } else {
-          console.log("❌ Cookie não foi criado!")
-          setError("Erro na autenticação. Tente novamente.")
-        }
+        // ✅ Redirecionamento direto — não checa cookie HttpOnly
+        console.log("🔄 Redirecionando para feed...")
+        window.location.href = "/feed"
       } else {
         console.log("❌ Erro no login:", data.message)
         setError(data.message || "Erro ao fazer login")
