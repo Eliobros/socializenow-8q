@@ -18,6 +18,12 @@ async function getConversationMessages(
       return NextResponse.json({ error: "ID da conversa é obrigatório" }, { status: 400 })
     }
 
+    if (!ObjectId.isValid(conversationId)) {
+      return NextResponse.json({ error: "ID da conversa inválido" }, { status: 400 })
+    }
+
+    const conversationObjectId = new ObjectId(conversationId)
+
     const client = await clientPromise
     const db = client.db("socializenow")
     const messages = db.collection("messages")
@@ -26,7 +32,7 @@ async function getConversationMessages(
       .aggregate([
         {
           $match: {
-            conversationId: new ObjectId(conversationId),
+            conversationId: conversationObjectId,
           },
         },
         {
