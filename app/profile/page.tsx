@@ -1,100 +1,59 @@
 "use client"
 
 import React, { useEffect, useState } from "react"
+import { useParams } from "next/navigation"
 
-interface Profile {
-  _id: string
-  name: string
-  username: string
-  email: string
-  bio: string
-  avatar?: string
-  followers: number
-  following: number
-  postsCount: number
-  isFollowing: boolean
-}
+export default function TestUserProfile() {
+  const params = useParams()
+  const userId = params.userId
 
-export default function UserProfilePage({ params }: { params: { userId: string } }) {
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
-
-  console.log("Params recebidos na página:", params)
+  const [profile, setProfile] = useState(null)
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    async function fetchUserProfile() {
-      try {
-        setLoading(true)
-        setError(null)
+    if (!userId) return
 
-        const token = localStorage.getItem("token")
-        console.log("Token do localStorage:", token)
+    setLoading(true)
+    setError("")
+    setProfile(null)
 
-        if (!token) {
-          setError("Usuário não autenticado (token não encontrado)")
-          setLoading(false)
-          return
+    fetch(`/api/profile/${userId}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || "Erro desconhecido")
         }
-
-        if (!params.userId) {
-          setError("ID do usuário não informado")
-          setLoading(false)
-          return
-        }
-
-        const response = await fetch(`/api/profile/${params.userId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        console.log("Status da resposta da API:", response.status)
-
-        if (!response.ok) {
-          const errData = await response.json()
-          console.log("Erro da API:", errData)
-          setError(errData.error || "Erro desconhecido na API")
-          setLoading(false)
-          return
-        }
-
-        const data = await response.json()
-        console.log("Dados recebidos da API:", data)
-
-        if (!data.profile) {
-          setError("Perfil não encontrado")
-          setLoading(false)
-          return
-        }
-
+        return res.json()
+      })
+      .then((data) => {
         setProfile(data.profile)
-        setLoading(false)
-      } catch (err) {
-        console.error("Erro ao buscar perfil:", err)
-        setError("Erro inesperado ao buscar perfil")
-        setLoading(false)
-      }
-    }
-
-    fetchUserProfile()
-  }, [params.userId])
-
-  if (loading) return <div>Carregando perfil...</div>
-  if (error) return <div style={{ color: "red" }}>{error}</div>
-  if (!profile) return <div>Usuário não encontrado</div>
+      })
+      .catch((err) => {
+        setError(err.message)
+      })
+      .finally(() => setLoading(false))
+  }, [userId])
 
   return (
-    <div>
-      <h1>Perfil de {profile.name}</h1>
-      <p>Username: {profile.username}</p>
-      <p>Email: {profile.email}</p>
-      <p>Bio: {profile.bio || "Sem biografia"}</p>
-      <p>Seguidores: {profile.followers}</p>
-      <p>Seguindo: {profile.following}</p>
-      <p>Posts: {profile.postsCount}</p>
-      <img src={profile.avatar} alt={`${profile.name} avatar`} width={150} />
-      <p>Está seguindo? {profile.isFollowing ? "Sim" : "Não"}</p>
+    <div style={{ padding: 20 }}>
+      <h2>Teste perfil do usuário</h2>
+      <p>UserId da URL: <b>{userId || "Não definido"}</b></p>
+
+      {loading && <p>Carregando...</p>}
+      {error && <p style={{ color: "red" }}>Erro: {error}</p>}
+
+      {profile && (
+        <div style={{ marginTop: 20 }}>
+          <p><b>Nome:</b> {profile.name}</p>
+          <p><b>Email:</b> {profile.email}</p>
+          <p><b>Username:</b> {profile.username}</p>
+          <p><b>Followers:</b> {profile.followers}</p>
+          <p><b>Following:</b> {profile.following}</p>
+          <p><b>Posts count:</b> {profile.postsCount}</p>
+          <img src={profile.avatar} alt="Avatar" width={100} height={100} style={{ borderRadius: "50%" }} />
+        </div>
+      )}
     </div>
   )
 }
