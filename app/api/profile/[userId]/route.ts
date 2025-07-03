@@ -3,10 +3,7 @@ import { withAuth, getAuthUser } from "@/lib/withAuth"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 
-async function getUserProfile(
-  request: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+async function testUserPosts(request: NextRequest, { params }: { params: { userId: string } }) {
   try {
     const user = getAuthUser(request)
     if (!user) {
@@ -14,60 +11,37 @@ async function getUserProfile(
     }
 
     const { userId } = params
+
+    console.log("Usuário autenticado (token):", user.userId)
+    console.log("Usuário alvo (param):", userId)
+
     if (!ObjectId.isValid(userId)) {
       return NextResponse.json({ error: "ID do usuário inválido" }, { status: 400 })
     }
 
+    const targetUserId = new ObjectId(userId)
     const client = await clientPromise
     const db = client.db("socializenow")
-    const users = db.collection("users")
-    const profiles = db.collection("profiles")
-    const follows = db.collection("follows")
     const posts = db.collection("posts")
 
-    const targetUserId = new ObjectId(userId)
-    const currentUserId = new ObjectId(user.userId)
+    const postsList = await posts
+      .find({ authorId: targetUserId })
+      .project({ content: 1, createdAt: 1 })
+      .sort({ createdAt: -1 })
+      .toArray()
 
-    // Get user basic info
-    const targetUser = await users.findOne({ _id: targetUserId })
-    if (!targetUser) {
-      return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
-    }
+    console.log("Quantidade de posts encontrados:", postsList.length)
 
-    // Get profile info
-    const profileInfo = await profiles.findOne({ userId: targetUserId })
-
-    // Count followers and following
-    const followersCount = await follows.countDocuments({ followingId: targetUserId })
-    const followingCount = await follows.countDocuments({ followerId: targetUserId })
-
-    // Count posts
-    const postsCount = await posts.countDocuments({ authorId: targetUserId })
-
-    // Check if current user is following this user
-    const isFollowing = await follows.findOne({
-      followerId: currentUserId,
-      followingId: targetUserId,
+    return NextResponse.json({
+      authenticatedUserId: user.userId,
+      targetUserId: userId,
+      postsCount: postsList.length,
+      posts: postsList,
     })
-
-    const profile = {
-      _id: targetUser._id,
-      name: targetUser.name,
-      username: profileInfo?.username || targetUser.email.split("@")[0],
-      email: targetUser.email,
-      bio: profileInfo?.bio || "",
-      avatar: profileInfo?.avatar,
-      followers: followersCount,
-      following: followingCount,
-      postsCount: postsCount,
-      isFollowing: !!isFollowing,
-    }
-
-    return NextResponse.json({ profile })
   } catch (error) {
-    console.error("Get user profile error:", error)
+    console.error("Erro na rota temporária:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
 
-export const GET = withAuth(getUserProfile)
+export const GET = withAuth(testUserPosts)
