@@ -2,311 +2,233 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { toast } from "react-toastify"
-import "react-toastify/dist/ReactToastify.css"
-import { useAuth } from "@/hooks/useAuth"
+import { Navbar } from "@/components/navbar"
+import { PostCard } from "@/components/post-card"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, MessageCircle, UserPlus, UserMinus } from "lucide-react"
 
-export default function ProfilePage() {
-  const { user, loading: authLoading, isAuthenticated } = useAuth()
+interface UserProfile {
+  _id: string
+  name: string
+  username: string
+  email: string
+  bio: string
+  avatar?: string
+  followers: number
+  following: number
+  postsCount: number
+  isFollowing?: boolean
+}
+
+interface Post {
+  _id: string
+  content: string
+  author: {
+    _id: string
+    name: string
+    email: string
+    avatar?: string
+  }
+  createdAt: string
+  likes: number
+}
+
+export default function UserProfilePage({ params }: { params: { userId: string } }) {
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [posts, setPosts] = useState<Post[]>([])
+  const [loading, setLoading] = useState(true)
+  const [following, setFollowing] = useState(false)
+  const [error, setError] = useState("")
   const router = useRouter()
 
-  const [profile, setProfile] = useState({
-    name: "",
-    bio: "",
-    location: "",
-    website: "",
-    avatar: "",
-  })
-  const [posts, setPosts] = useState([])
-  const [newPost, setNewPost] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [profileForm, setProfileForm] = useState({
-    name: "",
-    bio: "",
-    location: "",
-    website: "",
-  })
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-  })
-  const [avatarPreview, setAvatarPreview] = useState("")
-
-  const fetchProfile = async () => {
-    try {
-      const response = await fetch("/api/profile", {
-        credentials: "include",
-      })
-      const data = await response.json()
-      setProfile(data)
-      setProfileForm({
-        name: data.name,
-        bio: data.bio,
-        location: data.location,
-        website: data.website,
-      })
-      if (data.avatar) {
-        setAvatarPreview(data.avatar)
-      }
-    } catch (error) {
-      console.error("Error fetching profile:", error)
-      toast.error("Error fetching profile")
-    }
-  }
-
-  const fetchUserPosts = async () => {
-  try {
-    const response = await fetch("/api/profile/posts", {
-      credentials: "include",
-    })
-    const data = await response.json()
-    setPosts(data.posts || [])  // <-- aqui a correção
-  } catch (error) {
-    console.error("Error fetching user posts:", error)
-    toast.error("Error fetching user posts")
-  } finally {
-    setLoading(false)
-  }
-}
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      fetchProfile()
-      fetchUserPosts()
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+      return
     }
-  }, [authLoading, isAuthenticated])
+    fetchUserProfile()
+    fetchUserPosts()
+  }, [params.userId, router])
 
-  const createProfileUpdatePost = async (e: any) => {
-    e.preventDefault()
+  const fetchUserProfile = async () => {
     try {
-      const formData = new FormData()
-      formData.append("content", newPost)
-
-      const postResponse = await fetch("/api/posts", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      })
-
-      if (postResponse.ok) {
-        toast.success("Post created successfully!")
-        setNewPost("")
-        fetchUserPosts()
-      } else {
-        toast.error("Failed to create post")
-      }
-    } catch (error) {
-      console.error("Error creating post:", error)
-      toast.error("Error creating post")
-    }
-  }
-
-  const handleFileUpload = async (event: any) => {
-    const file = event.target.files[0]
-    if (!file) return
-
-    const formData = new FormData()
-    formData.append("avatar", file)
-
-    try {
-      const response = await fetch("/api/profile/avatar", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
+      const token = localStorage.getItem("token")
+      const response = await fetch(`/api/profile/${params.userId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       })
 
       if (response.ok) {
         const data = await response.json()
-        setProfile((prev) => ({ ...prev, avatar: data.avatar }))
-        setAvatarPreview(data.avatar)
-        toast.success("Avatar updated successfully!")
+        setProfile(data.profile)
+        setFollowing(data.profile.isFollowing || false)
       } else {
-        toast.error("Failed to update avatar")
+        setError("Erro ao carregar perfil")
       }
     } catch (error) {
-      console.error("Error updating avatar:", error)
-      toast.error("Error updating avatar")
+      setError("Erro de conexão")
     }
   }
 
-  const handleProfileUpdate = async () => {
+  const fetchUserPosts = async () => {
     try {
-      const response = await fetch("/api/profile", {
-        method: "PUT",
+      const token = localStorage.getItem("token")
+      const response = await fetch(`/api/profile/${params.userId}/posts`, {
         headers: {
-          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        credentials: "include",
-        body: JSON.stringify(profileForm),
       })
 
       if (response.ok) {
-        setProfile((prev) => ({ ...prev, ...profileForm }))
-        toast.success("Profile updated successfully!")
-      } else {
-        toast.error("Failed to update profile")
+        const data = await response.json()
+        setPosts(data.posts)
       }
     } catch (error) {
-      console.error("Error updating profile:", error)
-      toast.error("Error updating profile")
+      console.error("Error fetching posts:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handlePasswordUpdate = async () => {
-    try {
-      const response = await fetch("/api/profile/password", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          currentPassword: passwordForm.currentPassword,
-          newPassword: passwordForm.newPassword,
-        }),
-      })
+  const handleFollow = async () => {
+  try {
+    const token = localStorage.getItem("token")
+    const response = await fetch("/api/follow", {
+      method: following ? "DELETE" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userId: params.userId }),
+    })
 
-      if (response.ok) {
-        toast.success("Password updated successfully!")
-        setPasswordForm({ currentPassword: "", newPassword: "" })
-      } else {
-        toast.error("Failed to update password")
+    if (response.ok) {
+      const data = await response.json()
+
+      // Atualize diretamente com os dados retornados da API
+      setFollowing(data.following)
+      if (profile) {
+        setProfile({
+          ...profile,
+          followers: data.followers, // <- use o valor retornado da API!
+        })
       }
-    } catch (error) {
-      console.error("Error updating password:", error)
-      toast.error("Error updating password")
+    } else {
+      const data = await response.json()
+      setError(data.error || "Erro ao seguir usuário")
     }
+  } catch (error) {
+    console.error("Erro ao seguir usuário:", error)
+    setError("Erro ao seguir usuário")
+  }
+}
+
+  const handleMessage = () => {
+    router.push(`/messages?user=${params.userId}`)
   }
 
-  if (authLoading || loading) {
-    return <div>Loading...</div>
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
   }
 
-  // Se não estiver autenticado, o hook useAuth já redireciona
-  if (!isAuthenticated) {
-    return null
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
+          <Alert variant="destructive">
+            <AlertDescription>Usuário não encontrado</AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="container mx-auto mt-8">
-      <ToastContainer />
-      <h1 className="text-2xl font-bold mb-4">Your Profile</h1>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      {/* Profile Information */}
-      <div className="mb-6">
-        <div className="flex items-center mb-4">
-          <img
-            src={avatarPreview || profile.avatar || "/default-avatar.png"}
-            alt="Avatar"
-            className="w-20 h-20 rounded-full mr-4"
-          />
-          <div>
-            <input type="file" accept="image/*" onChange={handleFileUpload} />
-          </div>
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <Avatar className="h-24 w-24">
+                {profile.avatar ? <AvatarImage src={profile.avatar || "/placeholder.svg"} alt={profile.name} /> : null}
+                <AvatarFallback className="bg-blue-600 text-white text-2xl">{getInitials(profile.name)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 text-center sm:text-left">
+                <CardTitle className="text-2xl mb-2">{profile.name}</CardTitle>
+                <p className="text-gray-600 mb-2">@{profile.username}</p>
+                {profile.bio && <p className="text-gray-700 mb-4">{profile.bio}</p>}
+                <div className="flex justify-center sm:justify-start gap-4 mb-4">
+                  <Badge variant="secondary">{profile.postsCount} Posts</Badge>
+                  <Badge variant="secondary">{profile.followers} Seguidores</Badge>
+                  <Badge variant="secondary">{profile.following} Seguindo</Badge>
+                </div>
+                <div className="flex justify-center sm:justify-start gap-2">
+                  <Button onClick={handleFollow} variant={following ? "outline" : "default"}>
+                    {following ? (
+                      <>
+                        <UserMinus className="mr-2 h-4 w-4" />
+                        Deixar de seguir
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Seguir
+                      </>
+                    )}
+                  </Button>
+                  <Button onClick={handleMessage} variant="outline">
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Mensagem
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold">Posts de {profile.name}</h2>
+          {posts.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <p className="text-gray-500">Nenhum post encontrado.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            posts.map((post) => <PostCard key={post._id} post={post} />)
+          )}
         </div>
-        <p>
-          <strong>Name:</strong> {profile.name}
-        </p>
-        <p>
-          <strong>Bio:</strong> {profile.bio}
-        </p>
-        <p>
-          <strong>Location:</strong> {profile.location}
-        </p>
-        <p>
-          <strong>Website:</strong> {profile.website}
-        </p>
-      </div>
-
-      {/* Update Profile Form */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">Update Profile</h2>
-        <input
-          type="text"
-          placeholder="Name"
-          className="w-full p-2 border rounded mb-2"
-          value={profileForm.name}
-          onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-        />
-        <textarea
-          placeholder="Bio"
-          className="w-full p-2 border rounded mb-2"
-          value={profileForm.bio}
-          onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Location"
-          className="w-full p-2 border rounded mb-2"
-          value={profileForm.location}
-          onChange={(e) => setProfileForm({ ...profileForm, location: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Website"
-          className="w-full p-2 border rounded mb-2"
-          value={profileForm.website}
-          onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
-        />
-        <button className="bg-blue-500 text-white p-2 rounded hover:bg-blue-700" onClick={handleProfileUpdate}>
-          Update Profile
-        </button>
-      </div>
-
-      {/* Update Password Form */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">Update Password</h2>
-        <input
-          type="password"
-          placeholder="Current Password"
-          className="w-full p-2 border rounded mb-2"
-          value={passwordForm.currentPassword}
-          onChange={(e) =>
-            setPasswordForm({
-              ...passwordForm,
-              currentPassword: e.target.value,
-            })
-          }
-        />
-        <input
-          type="password"
-          placeholder="New Password"
-          className="w-full p-2 border rounded mb-2"
-          value={passwordForm.newPassword}
-          onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-        />
-        <button className="bg-blue-500 text-white p-2 rounded hover:bg-blue-700" onClick={handlePasswordUpdate}>
-          Update Password
-        </button>
-      </div>
-
-      {/* Create Post Form */}
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">Create a Post</h2>
-        <form onSubmit={createProfileUpdatePost}>
-          <textarea
-            placeholder="What's on your mind?"
-            className="w-full p-2 border rounded mb-2"
-            value={newPost}
-            onChange={(e) => setNewPost(e.target.value)}
-          />
-          <button type="submit" className="bg-green-500 text-white p-2 rounded hover:bg-green-700">
-            Create Post
-          </button>
-        </form>
-      </div>
-
-      {/* User Posts */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Your Posts</h2>
-        {posts.map((post) => (
-          <div key={post.id} className="border rounded p-4 mb-2">
-            <p>{post.content}</p>
-            <p className="text-gray-500">Created at: {new Date(post.createdAt).toLocaleString()}</p>
-          </div>
-        ))}
       </div>
     </div>
   )
 }
-
-import { ToastContainer } from "react-toastify"
