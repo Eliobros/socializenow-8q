@@ -18,7 +18,7 @@ export default function TestUserProfile() {
     setError("")
     setProfile(null)
 
-    fetch(`/api/profile/${userId}`)
+    fetch(`/api/profile`)
       .then(async (res) => {
         if (!res.ok) {
           const data = await res.json()
