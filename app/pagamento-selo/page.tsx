@@ -236,7 +236,7 @@ const pagar = async () => {
         </Card>
 
         <div className="text-center mt-6 text-sm text-gray-500">
-          <p>Pagamento seguro processado via EliobrosPayment API</p>
+          <p>Pagamento seguro processado via MozPayment</p>
         </div>
       </div>
     </div>

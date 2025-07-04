@@ -1,22 +1,35 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { withAuth, getAuthUser } from "@/lib/withAuth"
+import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 
-async function createSupportTicket(request: NextRequest) {
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
+
+function verifyToken(request: NextRequest) {
+  const authHeader = request.headers.get("authorization")
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null
+  }
+
+  const token = authHeader.substring(7)
   try {
-    const user = getAuthUser(request)
+    return jwt.verify(token, JWT_SECRET) as any
+  } catch (error) {
+    return null
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = verifyToken(request)
     if (!user) {
-      return NextResponse.json({ error: "Usuário não autenticado" }, { status: 401 })
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
     }
 
     const { subject, message } = await request.json()
 
     if (!subject || !message) {
-      return NextResponse.json(
-        { error: "Assunto e mensagem são obrigatórios" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Assunto e mensagem são obrigatórios" }, { status: 400 })
     }
 
     const client = await clientPromise
@@ -24,11 +37,13 @@ async function createSupportTicket(request: NextRequest) {
     const supportTickets = db.collection("supportTickets")
     const users = db.collection("users")
 
+    // Buscar dados do usuário
     const userData = await users.findOne({ _id: new ObjectId(user.userId) })
     if (!userData) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
 
+    // Criar ticket
     await supportTickets.insertOne({
       userId: new ObjectId(user.userId),
       name: userData.name,
@@ -46,5 +61,3 @@ async function createSupportTicket(request: NextRequest) {
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
-
-export const POST = withAuth(createSupportTicket)

@@ -1,13 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { withAuth, getAuthUser } from "@/lib/withAuth"
+import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 
-async function getUnreadMessages(request: NextRequest) {
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
+
+function verifyToken(request: NextRequest) {
+  const authHeader = request.headers.get("authorization")
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null
+  }
+
+  const token = authHeader.substring(7)
   try {
-    const user = getAuthUser(request)
+    return jwt.verify(token, JWT_SECRET) as any
+  } catch (error) {
+    return null
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = verifyToken(request)
     if (!user) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
     }
 
     const client = await clientPromise
@@ -21,10 +37,7 @@ async function getUnreadMessages(request: NextRequest) {
 
     return NextResponse.json({ count })
   } catch (error) {
-    console.error("Erro ao contar mensagens não lidas:", error)
+    console.error("Get unread messages count error:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
-
-// Exporta com proteção de autenticação
-export const GET = withAuth(getUnreadMessages)

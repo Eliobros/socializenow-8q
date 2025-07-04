@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -25,8 +26,6 @@ export default function LoginPage() {
     setError("")
     setLoading(true)
 
-    console.log("🔄 Iniciando login...")
-
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -34,28 +33,17 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
-        credentials: "include", // 👉 Importante para receber cookies HTTP-only
       })
 
-      console.log("📡 Resposta do servidor:", response.status)
-
       const data = await response.json()
-      console.log("📦 Dados recebidos:", data)
 
       if (response.ok) {
-        console.log("✅ Login bem-sucedido!")
-
-        // ⏳ Garantir que o navegador tenha tempo de salvar o cookie
-        setTimeout(() => {
-          console.log("🔄 Redirecionando para /feed")
-          router.push("/feed") // 👉 Navegação suave com router.push
-        }, 100)
+        localStorage.setItem("token", data.token)
+        router.push("/feed")
       } else {
-        console.log("❌ Erro no login:", data.message)
-        setError(data.message || "Erro ao fazer login")
+        setError(data.error || "Erro ao fazer login")
       }
-    } catch (err) {
-      console.error("💥 Erro na requisição:", err)
+    } catch (error) {
       setError("Erro de conexão. Tente novamente.")
     } finally {
       setLoading(false)
@@ -78,6 +66,7 @@ export default function LoginPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -89,6 +78,7 @@ export default function LoginPage() {
                 required
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
               <Input
@@ -100,11 +90,13 @@ export default function LoginPage() {
                 required
               />
             </div>
+
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Entrar
             </Button>
           </form>
+
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Não tem uma conta?{" "}

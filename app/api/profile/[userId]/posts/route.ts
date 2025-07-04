@@ -1,13 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { withAuth, getAuthUser } from "@/lib/withAuth"
+import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 
-async function getUserPosts(request: NextRequest, { params }: { params: { userId: string } }) {
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
+
+function verifyToken(request: NextRequest) {
+  const authHeader = request.headers.get("authorization")
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null
+  }
+
+  const token = authHeader.substring(7)
   try {
-    const user = getAuthUser(request)
+    return jwt.verify(token, JWT_SECRET) as any
+  } catch (error) {
+    return null
+  }
+}
+
+export async function GET(request: NextRequest, { params }: { params: { userId: string } }) {
+  try {
+    const user = verifyToken(request)
     if (!user) {
-      return NextResponse.json({ error: "Usuário não autenticado" }, { status: 401 })
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
     }
 
     const { userId } = params
@@ -21,9 +37,12 @@ async function getUserPosts(request: NextRequest, { params }: { params: { userId
 
     const targetUserId = new ObjectId(userId)
 
+    // Get posts with author information
     const postsList = await posts
       .aggregate([
-        { $match: { authorId: targetUserId } },
+        {
+          $match: { authorId: targetUserId },
+        },
         {
           $lookup: {
             from: "users",
@@ -40,7 +59,9 @@ async function getUserPosts(request: NextRequest, { params }: { params: { userId
             as: "profile",
           },
         },
-        { $unwind: "$author" },
+        {
+          $unwind: "$author",
+        },
         {
           $project: {
             content: 1,
@@ -48,10 +69,13 @@ async function getUserPosts(request: NextRequest, { params }: { params: { userId
             likes: 1,
             "author._id": 1,
             "author.name": 1,
+            "author.email": 1,
             "author.avatar": { $arrayElemAt: ["$profile.avatar", 0] },
           },
         },
-        { $sort: { createdAt: -1 } },
+        {
+          $sort: { createdAt: -1 },
+        },
       ])
       .toArray()
 
@@ -61,5 +85,3 @@ async function getUserPosts(request: NextRequest, { params }: { params: { userId
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
-
-export const GET = withAuth(getUserPosts)

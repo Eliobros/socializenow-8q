@@ -1,14 +1,8 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { withAuth, getAuthUser } from "@/lib/withAuth"
+import { NextResponse } from "next/server"
 import clientPromise from "@/lib/mongodb"
 
-async function getVerifyRequests(request: NextRequest) {
+export async function GET() {
   try {
-    const user = getAuthUser(request)
-    if (!user) {
-      return NextResponse.json({ error: "Usuário não autenticado" }, { status: 401 })
-    }
-
     const client = await clientPromise
     const db = client.db("socializenow")
     const verifyRequests = db.collection("verifyRequests")
@@ -23,7 +17,9 @@ async function getVerifyRequests(request: NextRequest) {
             as: "user",
           },
         },
-        { $unwind: "$user" },
+        {
+          $unwind: "$user",
+        },
         {
           $project: {
             fullName: 1,
@@ -38,7 +34,9 @@ async function getVerifyRequests(request: NextRequest) {
             "user.avatar": 1,
           },
         },
-        { $sort: { createdAt: -1 } },
+        {
+          $sort: { createdAt: -1 },
+        },
       ])
       .toArray()
 
@@ -48,5 +46,3 @@ async function getVerifyRequests(request: NextRequest) {
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
-
-export const GET = withAuth(getVerifyRequests)

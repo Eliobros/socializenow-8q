@@ -1,20 +1,36 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { withAuth, getAuthUser } from "@/lib/withAuth"
+import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 
-// GET: Buscar conversas do usuário logado
-async function getConversations(request: NextRequest) {
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
+
+function verifyToken(request: NextRequest) {
+  const authHeader = request.headers.get("authorization")
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null
+  }
+
+  const token = authHeader.substring(7)
   try {
-    const user = getAuthUser(request)
+    return jwt.verify(token, JWT_SECRET) as any
+  } catch (error) {
+    return null
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = verifyToken(request)
     if (!user) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
     }
 
     const client = await clientPromise
     const db = client.db("socializenow")
     const conversations = db.collection("conversations")
 
+    // Get conversations where user is a participant
     const userConversations = await conversations
       .aggregate([
         {
@@ -33,7 +49,7 @@ async function getConversations(request: NextRequest) {
         {
           $addFields: {
             participants: "$participantDetails",
-            unreadCount: 0, // (placeholder, pode ser calculado depois)
+            unreadCount: 0, // TODO: Implement unread count
           },
         },
         {
@@ -56,17 +72,16 @@ async function getConversations(request: NextRequest) {
 
     return NextResponse.json({ conversations: userConversations })
   } catch (error) {
-    console.error("Erro ao buscar conversas:", error)
+    console.error("Get conversations error:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
 
-// POST: Criar nova conversa (ou retornar se já existir)
-async function createConversation(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const user = getAuthUser(request)
+    const user = verifyToken(request)
     if (!user) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
     }
 
     const { userId } = await request.json()
@@ -79,6 +94,7 @@ async function createConversation(request: NextRequest) {
     const db = client.db("socializenow")
     const conversations = db.collection("conversations")
 
+    // Check if conversation already exists
     const existingConversation = await conversations.findOne({
       participants: {
         $all: [new ObjectId(user.userId), new ObjectId(userId)],
@@ -90,6 +106,7 @@ async function createConversation(request: NextRequest) {
       return NextResponse.json({ conversationId: existingConversation._id })
     }
 
+    // Create new conversation
     const result = await conversations.insertOne({
       participants: [new ObjectId(user.userId), new ObjectId(userId)],
       lastMessage: {
@@ -103,11 +120,7 @@ async function createConversation(request: NextRequest) {
 
     return NextResponse.json({ conversationId: result.insertedId })
   } catch (error) {
-    console.error("Erro ao criar conversa:", error)
+    console.error("Create conversation error:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
-
-// Exporta as rotas com proteção
-export const GET = withAuth(getConversations)
-export const POST = withAuth(createConversation)

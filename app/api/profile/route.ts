@@ -1,28 +1,44 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { withAuth, getAuthUser } from "@/lib/withAuth"
+import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
 import clientPromise from "@/lib/mongodb"
 
-// GET - Buscar perfil do usuário logado
-async function getProfile(request: NextRequest) {
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
+
+function verifyToken(request: NextRequest) {
+  const authHeader = request.headers.get("authorization")
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null
+  }
+
+  const token = authHeader.substring(7)
   try {
-    const user = getAuthUser(request)
+    return jwt.verify(token, JWT_SECRET) as any
+  } catch (error) {
+    return null
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = verifyToken(request)
+    if (!user) {
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
+    }
+
     const client = await clientPromise
     const db = client.db("socializenow")
     const users = db.collection("users")
     const posts = db.collection("posts")
 
-    // Buscar perfil do usuário
-    const userProfile = await users.findOne(
-      { _id: new ObjectId(user.userId) },
-      { projection: { password: 0 } }
-    )
+    // Get user profile
+    const userProfile = await users.findOne({ _id: new ObjectId(user.userId) }, { projection: { password: 0 } })
 
     if (!userProfile) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
 
-    // Contar posts do usuário
+    // Count user posts
     const postsCount = await posts.countDocuments({ authorId: new ObjectId(user.userId) })
 
     const profile = {
@@ -38,15 +54,17 @@ async function getProfile(request: NextRequest) {
 
     return NextResponse.json({ profile })
   } catch (error) {
-    console.error("Erro ao buscar perfil:", error)
+    console.error("Get profile error:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
 
-// PUT - Atualizar perfil do usuário
-async function updateProfile(request: NextRequest) {
+export async function PUT(request: NextRequest) {
   try {
-    const user = getAuthUser(request)
+    const user = verifyToken(request)
+    if (!user) {
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
+    }
 
     const { name, username, bio, avatar } = await request.json()
 
@@ -58,13 +76,12 @@ async function updateProfile(request: NextRequest) {
     const db = client.db("socializenow")
     const users = db.collection("users")
 
-    // Verificar se o nome de usuário já está em uso
+    // Check if username is already taken (if provided)
     if (username) {
       const existingUser = await users.findOne({
         username,
         _id: { $ne: new ObjectId(user.userId) },
       })
-
       if (existingUser) {
         return NextResponse.json({ error: "Nome de usuário já está em uso" }, { status: 400 })
       }
@@ -85,11 +102,7 @@ async function updateProfile(request: NextRequest) {
 
     return NextResponse.json({ message: "Perfil atualizado com sucesso" })
   } catch (error) {
-    console.error("Erro ao atualizar perfil:", error)
+    console.error("Update profile error:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
-
-// Exportações protegidas com withAuth
-export const GET = withAuth(getProfile)
-export const PUT = withAuth(updateProfile)

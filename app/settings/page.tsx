@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/navbar"
@@ -13,10 +14,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { CheckCircle, Shield, HelpCircle, Loader2, Upload } from "lucide-react"
-import { useAuth } from "@/hooks/useAuth"
 
 export default function SettingsPage() {
-  const { user, loading: authLoading, isAuthenticated } = useAuth()
+  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
@@ -42,14 +42,37 @@ export default function SettingsPage() {
   })
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated && user) {
-      setVerifyForm((prev) => ({
-        ...prev,
-        fullName: user.name,
-      }))
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+      return
+    }
+    fetchUserData()
+  }, [router])
+
+  const fetchUserData = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("/api/profile", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setUser(data.profile)
+        setVerifyForm((prev) => ({
+          ...prev,
+          fullName: data.profile.name,
+        }))
+      }
+    } catch (error) {
+      setError("Erro ao carregar dados do usuário")
+    } finally {
       setLoading(false)
     }
-  }, [authLoading, isAuthenticated, user])
+  }
 
   const handleVerifySubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -69,15 +92,19 @@ export default function SettingsPage() {
       formData.append("documentFront", verifyForm.documentFront)
       formData.append("documentBack", verifyForm.documentBack)
 
+      const token = localStorage.getItem("token")
       const response = await fetch("/api/profile/verify-request", {
         method: "POST",
-        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: formData,
       })
 
       const data = await response.json()
 
       if (response.ok) {
+        // Redirecionar para pagamento em vez de mostrar sucesso
         router.push("/pagamento-selo")
       } else {
         setError(data.error || "Erro ao enviar solicitação")
@@ -95,12 +122,13 @@ export default function SettingsPage() {
     setError("")
 
     try {
+      const token = localStorage.getItem("token")
       const response = await fetch("/api/support", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        credentials: "include",
         body: JSON.stringify(supportForm),
       })
 
@@ -123,7 +151,7 @@ export default function SettingsPage() {
     }
   }
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
@@ -132,10 +160,6 @@ export default function SettingsPage() {
         </div>
       </div>
     )
-  }
-
-  if (!isAuthenticated) {
-    return null
   }
 
   return (

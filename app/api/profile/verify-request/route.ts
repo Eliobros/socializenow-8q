@@ -1,15 +1,31 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { withAuth, getAuthUser } from "@/lib/withAuth"
+import jwt from "jsonwebtoken"
 import { ObjectId } from "mongodb"
 import { writeFile, mkdir } from "fs/promises"
 import { join } from "path"
 import clientPromise from "@/lib/mongodb"
 
-async function createVerifyRequest(request: NextRequest) {
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
+
+function verifyToken(request: NextRequest) {
+  const authHeader = request.headers.get("authorization")
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null
+  }
+
+  const token = authHeader.substring(7)
   try {
-    const user = getAuthUser(request)
+    return jwt.verify(token, JWT_SECRET) as any
+  } catch (error) {
+    return null
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = verifyToken(request)
     if (!user) {
-      return NextResponse.json({ error: "Usuário não autenticado" }, { status: 401 })
+      return NextResponse.json({ error: "Token inválido" }, { status: 401 })
     }
 
     const formData = await request.formData()
@@ -24,21 +40,12 @@ async function createVerifyRequest(request: NextRequest) {
     }
 
     // Validar arquivos
-    if (
-      !documentFront.type.startsWith("image/") ||
-      !documentBack.type.startsWith("image/")
-    ) {
-      return NextResponse.json(
-        { error: "Apenas arquivos de imagem são permitidos" },
-        { status: 400 }
-      )
+    if (!documentFront.type.startsWith("image/") || !documentBack.type.startsWith("image/")) {
+      return NextResponse.json({ error: "Apenas arquivos de imagem são permitidos" }, { status: 400 })
     }
 
     if (documentFront.size > 5 * 1024 * 1024 || documentBack.size > 5 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "As imagens devem ter no máximo 5MB" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "As imagens devem ter no máximo 5MB" }, { status: 400 })
     }
 
     const client = await clientPromise
@@ -53,10 +60,7 @@ async function createVerifyRequest(request: NextRequest) {
     })
 
     if (existingRequest) {
-      return NextResponse.json(
-        { error: "Você já possui uma solicitação pendente" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Você já possui uma solicitação pendente" }, { status: 400 })
     }
 
     // Salvar arquivos
@@ -67,7 +71,11 @@ async function createVerifyRequest(request: NextRequest) {
     const backFilename = `${user.userId}_back_${timestamp}.${backExtension}`
 
     const uploadDir = join(process.cwd(), "public", "documents")
-    await mkdir(uploadDir, { recursive: true })
+    try {
+      await mkdir(uploadDir, { recursive: true })
+    } catch (error) {
+      // Directory might already exist
+    }
 
     const frontBytes = await documentFront.arrayBuffer()
     const backBytes = await documentBack.arrayBuffer()
@@ -105,5 +113,3 @@ async function createVerifyRequest(request: NextRequest) {
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }
-
-export const POST = withAuth(createVerifyRequest)
